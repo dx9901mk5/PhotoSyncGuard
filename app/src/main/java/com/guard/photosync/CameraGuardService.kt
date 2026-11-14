@@ -55,19 +55,19 @@ class CameraGuardService : AccessibilityService() {
         }
     }
 
-    private val restoreNetworkRunnable = Runnable {
+    private val restoreNetworkRunnable: Runnable = Runnable {
         if (!isCameraInForeground && ShizukuNetHelper.isBlocked) {
             val unfinishedFile = findUnfinishedFileInCameraDir()
             val idleSinceLastEvent = System.currentTimeMillis() - lastFileEventTimeMs
             if (unfinishedFile != null && idleSinceLastEvent < SAFETY_TIMEOUT_MS) {
-                Log.i(TAG, "偵測到仍有未完成檔案 (" + unfinishedFile + ")，繼續延遲恢復網路")
+                Log.i(TAG, "偵測到仍有未完成檔案 ($unfinishedFile)，繼續延遲恢復網路")
                 GuardStateManager.addLog(
                     this,
                     GuardStateManager.LogCategory.PHOTO_WAIT,
                     "仍有暫存或未算完檔案，繼續阻斷",
-                    unfinishedFile + " 尚未消失或達 1MB，延後恢復網路"
+                    "$unfinishedFile 尚未消失或達 1MB，延後恢復網路"
                 )
-                GuardStateManager.notifyDelaying(this, "等待 " + unfinishedFile + " 算圖完成…")
+                GuardStateManager.notifyDelaying(this, "等待 $unfinishedFile 算圖完成…")
                 handler.postDelayed(restoreNetworkRunnable, 3000L)
                 return@Runnable
             }
@@ -76,7 +76,7 @@ class CameraGuardService : AccessibilityService() {
             val reason = if (unfinishedFile != null || hasUnfinishedSmallPhoto) {
                 "已達安全閒置時限（35秒無寫入），強制恢復 Google 相簿網路"
             } else {
-                "相機算圖完成並已離開相機（延遲 " + delaySec + " 秒緩衝），恢復 Google 相簿網路"
+                "相機算圖完成並已離開相機（延遲 ${delaySec} 秒緩衝），恢復 Google 相簿網路"
             }
             Log.i(TAG, reason)
             hasUnfinishedSmallPhoto = false
@@ -111,13 +111,13 @@ class CameraGuardService : AccessibilityService() {
                 isCameraInForeground = true
                 handler.removeCallbacks(restoreNetworkRunnable)
                 if (!ShizukuNetHelper.isBlocked) {
-                    Log.i(TAG, "偵測到相機開啟 (" + pkgName + ")，立即切斷 Google 相簿網路")
-                    ShizukuNetHelper.setPhotosNetworkBlocked(this, true, "偵測到相機開啟 (" + pkgName + ")")
+                    Log.i(TAG, "偵測到相機開啟 ($pkgName)，立即切斷 Google 相簿網路")
+                    ShizukuNetHelper.setPhotosNetworkBlocked(this, true, "偵測到相機開啟 ($pkgName)")
                 }
             } else {
                 if (isCameraInForeground) {
                     isCameraInForeground = false
-                    Log.i(TAG, "已離開相機，目前是否有未完成小圖鎖定: " + hasUnfinishedSmallPhoto)
+                    Log.i(TAG, "已離開相機，目前是否有未完成小圖鎖定: $hasUnfinishedSmallPhoto")
                     scheduleRestoreCheck()
                 }
             }
@@ -144,7 +144,7 @@ class CameraGuardService : AccessibilityService() {
                         scheduleRestoreCheck()
                     } else {
                         hasUnfinishedSmallPhoto = true
-                        ensureNetworkBlocked("偵測到相機暫存檔寫入: " + path)
+                        ensureNetworkBlocked("偵測到相機暫存檔寫入: $path")
                     }
                     return
                 }
@@ -161,20 +161,20 @@ class CameraGuardService : AccessibilityService() {
                                     this@CameraGuardService,
                                     GuardStateManager.LogCategory.PHOTO_WAIT,
                                     "偵測到未算完小圖 (< 1MB)",
-                                    path + " (" + sizeKb + " KB)，強制保持斷網等待算圖"
+                                    "$path (${sizeKb} KB)，強制保持斷網等待算圖"
                                 )
                             }
                             hasUnfinishedSmallPhoto = true
-                            ensureNetworkBlocked("偵測到小於 1MB 的未算完照片 (" + path + ", " + sizeKb + " KB)")
+                            ensureNetworkBlocked("偵測到小於 1MB 的未算完照片 ($path, ${sizeKb} KB)")
                         } else if (fileSize >= MIN_FINISHED_FILE_SIZE_BYTES) {
                             // 檔案 >= 1MB：認定為算圖完成並已覆寫為完整成片
                             if (hasUnfinishedSmallPhoto) {
-                                Log.i(TAG, "照片已算圖完成並覆寫 (" + path + ", " + sizeKb + " KB)，解除小圖鎖定")
+                                Log.i(TAG, "照片已算圖完成並覆寫 ($path, ${sizeKb} KB)，解除小圖鎖定")
                                 GuardStateManager.addLog(
                                     this@CameraGuardService,
                                     GuardStateManager.LogCategory.PHOTO_READY,
                                     "判讀照片算圖完成 (>= 1MB)",
-                                    path + " (" + sizeKb + " KB)，準備恢復 Google 相簿網路"
+                                    "$path (${sizeKb} KB)，準備恢復 Google 相簿網路"
                                 )
                             }
                             hasUnfinishedSmallPhoto = false
@@ -206,7 +206,7 @@ class CameraGuardService : AccessibilityService() {
                 file.length() in 1 until MIN_FINISHED_FILE_SIZE_BYTES &&
                 ageMs < 45_000L
             ) {
-                return name + " (" + (file.length() / 1024) + " KB)"
+                return "$name (${file.length() / 1024} KB)"
             }
         }
         return null
