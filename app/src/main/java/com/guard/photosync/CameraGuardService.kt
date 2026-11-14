@@ -22,10 +22,13 @@ class CameraGuardService : AccessibilityService() {
         private val CAMERA_PACKAGES = setOf(
             "com.android.camera",
             "com.oplus.camera",
+            "com.oppo.camera",
             "com.oneplus.camera",
             "com.google.android.GoogleCamera",
             "com.sec.android.app.camera",
             "com.vivo.camera",
+            "com.miui.camera",
+            "com.xiaomi.camera",
             "com.huawei.camera"
         )
         // 1MB 門檻 (1024 * 1024 bytes)
@@ -37,6 +40,8 @@ class CameraGuardService : AccessibilityService() {
     private val handler = Handler(Looper.getMainLooper())
     private var isCameraInForeground = false
     private var hasUnfinishedSmallPhoto = false
+    @Volatile
+    private var lastFileEventTimeMs = 0L
     private var fileObserver: FileObserver? = null
 
     private val forceRestoreReceiver = object : BroadcastReceiver() {
@@ -52,11 +57,26 @@ class CameraGuardService : AccessibilityService() {
 
     private val restoreNetworkRunnable = Runnable {
         if (!isCameraInForeground && ShizukuNetHelper.isBlocked) {
+            val unfinishedFile = findUnfinishedFileInCameraDir()
+            val idleSinceLastEvent = System.currentTimeMillis() - lastFileEventTimeMs
+            if (unfinishedFile != null && idleSinceLastEvent < SAFETY_TIMEOUT_MS) {
+                Log.i(TAG, "偵測到仍有未完成檔案 (" + unfinishedFile + ")，繼續延遲恢復網路")
+                GuardStateManager.addLog(
+                    this,
+                    GuardStateManager.LogCategory.PHOTO_WAIT,
+                    "仍有暫存或未算完檔案，繼續阻斷",
+                    unfinishedFile + " 尚未消失或達 1MB，延後恢復網路"
+                )
+                GuardStateManager.notifyDelaying(this, "等待 " + unfinishedFile + " 算圖完成…")
+                handler.postDelayed(restoreNetworkRunnable, 3000L)
+                return@Runnable
+            }
+
             val delaySec = GuardStateManager.getRestoreDelaySec(this)
-            val reason = if (hasUnfinishedSmallPhoto) {
+            val reason = if (unfinishedFile != null || hasUnfinishedSmallPhoto) {
                 "已達安全閒置時限（35秒無寫入），強制恢復 Google 相簿網路"
             } else {
-                "相機算圖完成並已離開相機（延遲 ${delaySec} 秒緩衝），恢復 Google 相簿網路"
+                "相機算圖完成並已離開相機（延遲 " + delaySec + " 秒緩衝），恢復 Google 相簿網路"
             }
             Log.i(TAG, reason)
             hasUnfinishedSmallPhoto = false
@@ -91,13 +111,13 @@ class CameraGuardService : AccessibilityService() {
                 isCameraInForeground = true
                 handler.removeCallbacks(restoreNetworkRunnable)
                 if (!ShizukuNetHelper.isBlocked) {
-                    Log.i(TAG, "偵測到相機開啟 ($pkgName)，立即切斷 Google 相簿網路")
-                    ShizukuNetHelper.setPhotosNetworkBlocked(this, true, "偵測到相機開啟 ($pkgName)")
+                    Log.i(TAG, "偵測到相機開啟 (" + pkgName + ")，立即切斷 Google 相簿網路")
+                    ShizukuNetHelper.setPhotosNetworkBlocked(this, true, "偵測到相機開啟 (" + pkgName + ")")
                 }
             } else {
                 if (isCameraInForeground) {
                     isCameraInForeground = false
-                    Log.i(TAG, "已離開相機，目前是否有未完成小圖鎖定: $hasUnfinishedSmallPhoto")
+                    Log.i(TAG, "已離開相機，目前是否有未完成小圖鎖定: " + hasUnfinishedSmallPhoto)
                     scheduleRestoreCheck()
                 }
             }
@@ -111,17 +131,24 @@ class CameraGuardService : AccessibilityService() {
         @Suppress("DEPRECATION")
         fileObserver = object : FileObserver(
             cameraDir.absolutePath,
-            CREATE or CLOSE_WRITE or MOVED_TO or MODIFY
+            CREATE or CLOSE_WRITE or MOVED_TO or MODIFY or DELETE or MOVED_FROM
         ) {
             override fun onEvent(event: Int, path: String?) {
                 if (path == null) return
-                // 忽略系統正在寫入的隱藏暫存檔（通常以 . 開頭或包含 pending）
-                if (path.startsWith(".") || path.contains("pending", ignoreCase = true)) {
-                    ensureNetworkBlocked("偵測到相機暫存檔寫入: $path")
+                lastFileEventTimeMs = System.currentTimeMillis()
+                val lowerPath = path.lowercase()
+                // 偵測系統正在寫入的隱藏暫存檔（通常以 . 開頭、包含 pending 或 .tmp）
+                if (path.startsWith(".") || lowerPath.contains("pending") || lowerPath.endsWith(".tmp")) {
+                    if ((event and (DELETE or MOVED_FROM)) != 0) {
+                        // 暫存檔被刪除或更名（代表可能剛完成轉存），重新排程檢查
+                        scheduleRestoreCheck()
+                    } else {
+                        hasUnfinishedSmallPhoto = true
+                        ensureNetworkBlocked("偵測到相機暫存檔寫入: " + path)
+                    }
                     return
                 }
                 // 僅針對照片格式進行大小檢查（排除 mp4 錄影檔以免長影片誤判）
-                val lowerPath = path.lowercase()
                 if (lowerPath.endsWith(".jpg") || lowerPath.endsWith(".jpeg") || lowerPath.endsWith(".heic")) {
                     val file = File(cameraDir, path)
                     if (file.exists()) {
@@ -134,20 +161,20 @@ class CameraGuardService : AccessibilityService() {
                                     this@CameraGuardService,
                                     GuardStateManager.LogCategory.PHOTO_WAIT,
                                     "偵測到未算完小圖 (< 1MB)",
-                                    "$path (${sizeKb} KB)，強制保持斷網等待算圖"
+                                    path + " (" + sizeKb + " KB)，強制保持斷網等待算圖"
                                 )
                             }
                             hasUnfinishedSmallPhoto = true
-                            ensureNetworkBlocked("偵測到小於 1MB 的未算完照片 ($path, ${sizeKb} KB)")
+                            ensureNetworkBlocked("偵測到小於 1MB 的未算完照片 (" + path + ", " + sizeKb + " KB)")
                         } else if (fileSize >= MIN_FINISHED_FILE_SIZE_BYTES) {
                             // 檔案 >= 1MB：認定為算圖完成並已覆寫為完整成片
                             if (hasUnfinishedSmallPhoto) {
-                                Log.i(TAG, "照片已算圖完成並覆寫 ($path, ${sizeKb} KB)，解除小圖鎖定")
+                                Log.i(TAG, "照片已算圖完成並覆寫 (" + path + ", " + sizeKb + " KB)，解除小圖鎖定")
                                 GuardStateManager.addLog(
                                     this@CameraGuardService,
                                     GuardStateManager.LogCategory.PHOTO_READY,
                                     "判讀照片算圖完成 (>= 1MB)",
-                                    "$path (${sizeKb} KB)，準備恢復 Google 相簿網路"
+                                    path + " (" + sizeKb + " KB)，準備恢復 Google 相簿網路"
                                 )
                             }
                             hasUnfinishedSmallPhoto = false
@@ -160,6 +187,29 @@ class CameraGuardService : AccessibilityService() {
             }
         }
         fileObserver?.startWatching()
+    }
+
+    private fun findUnfinishedFileInCameraDir(): String? {
+        val cameraDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM), "Camera")
+        val files = cameraDir.listFiles() ?: return null
+        val now = System.currentTimeMillis()
+        for (file in files) {
+            if (!file.isFile) continue
+            val name = file.name
+            val lower = name.lowercase()
+            val ageMs = now - file.lastModified()
+            // 忽略資源回收筒等舊隱藏檔，只檢查近 3 分鐘內的暫存檔
+            if ((name.startsWith(".pending") || lower.contains("pending") || lower.endsWith(".tmp")) && ageMs < 180_000L) {
+                return name
+            }
+            if ((lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".heic")) &&
+                file.length() in 1 until MIN_FINISHED_FILE_SIZE_BYTES &&
+                ageMs < 45_000L
+            ) {
+                return name + " (" + (file.length() / 1024) + " KB)"
+            }
+        }
+        return null
     }
 
     private fun ensureNetworkBlocked(reason: String) {
