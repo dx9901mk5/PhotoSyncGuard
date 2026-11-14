@@ -6,6 +6,9 @@
 
 ## 繁體中文說明
 
+> **⚠️ 必要前置條件（必須使用 Shizuku）**：
+> 本 App **必須搭配 [Shizuku](https://shizuku.rikka.app/) 服務啟動並完成授權**才能正常運作（免 Root，透過 Shizuku 執行系統級 Google 相簿斷網／復網控制；未安裝或未啟動 Shizuku 將無法阻斷網路）。
+
 ### 專案目的
 專為 **OPPO（ColorOS）、vivo（OriginOS / FuntouchOS）與小米（HyperOS）的全球版及中國版 ROM** 打造的免 Root Android 守護工具。
 
@@ -22,6 +25,9 @@
 ---
 
 ## English Description
+
+> **⚠️ Prerequisite (Shizuku Required)**:
+> This app **requires [Shizuku](https://shizuku.rikka.app/) to be installed, running, and authorized** (no root needed). Without Shizuku, PhotoSyncGuard cannot block or restore network access for Google Photos.
 
 ### Purpose
 A rootless Android companion app built for **OPPO (ColorOS), vivo (OriginOS / FuntouchOS), and Xiaomi (HyperOS) — both Global and CN ROMs**.
