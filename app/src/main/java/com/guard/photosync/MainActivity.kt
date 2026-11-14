@@ -1,4 +1,314 @@
-package com.guard.photosync    private fun buildSetupCard(): MaterialCardView {
+package com.guard.photosync
+
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.content.res.ColorStateList
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
+import android.net.Uri
+import android.os.Build
+import android.os.Bundle
+import android.provider.Settings
+import android.view.Gravity
+import android.view.ViewGroup
+import android.widget.LinearLayout
+import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import androidx.core.widget.NestedScrollView
+import com.google.android.material.appbar.MaterialToolbar
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.card.MaterialCardView
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.materialswitch.MaterialSwitch
+import com.google.android.material.slider.Slider
+import rikka.shizuku.Shizuku
+
+class MainActivity : AppCompatActivity() {
+
+    private lateinit var shizukuBadge: TextView
+    private lateinit var networkBadge: TextView
+    private lateinit var notifySwitch: MaterialSwitch
+    private lateinit var delayValueText: TextView
+    private lateinit var delaySlider: Slider
+    private lateinit var logContainer: LinearLayout
+    private lateinit var logCountText: TextView
+
+    private val permissionListener = Shizuku.OnRequestPermissionResultListener { _, grantResult ->
+        updateUI()
+        if (grantResult == PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(this, "Shizuku 授權成功", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private val stateListener: () -> Unit = {
+        updateUI()
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        Shizuku.addRequestPermissionResultListener(permissionListener)
+        GuardStateManager.addListener(stateListener)
+
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.md_background))
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        }
+
+        val toolbar = MaterialToolbar(this).apply {
+            title = "PhotoSyncGuard"
+            subtitle = "相機算圖期間延遲 Google 相簿備份"
+            setTitleTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface))
+            setSubtitleTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface_muted))
+            setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.md_surface))
+            elevation = dp(2).toFloat()
+        }
+        root.addView(toolbar)
+
+        val scrollView = NestedScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            )
+        }
+
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(24))
+        }
+
+        // 1. 最上方：緊急防呆按鈕（立即恢復 Google 相簿上傳與連線功能）
+        content.addView(buildFailsafeCard())
+
+        // 2. 系統狀態與通知開關卡片
+        content.addView(buildStatusAndNotifyCard())
+
+        // 3. 權限設定與手動測試卡片
+        content.addView(buildSetupCard())
+
+        // 4. 關於我、GitHub 專案與 APK 自動檢查更新卡片
+        content.addView(buildAboutAndUpdateCard())
+
+        // 5. 最下方：24 小時處理過程與阻擋/恢復紀錄
+        content.addView(buildLogCard())
+
+        scrollView.addView(content)
+        root.addView(scrollView)
+        setContentView(root)
+
+        // 啟動時自動檢查 GitHub 是否有新版本 APK
+        checkAppUpdate(manual = false)
+    }
+
+    private fun buildFailsafeCard(): MaterialCardView {
+        val card = createCard(
+            strokeColorRes = R.color.failsafe_bg,
+            strokeWidthDp = 2
+        )
+        val inner = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+        }
+
+        val title = TextView(this).apply {
+            text = "緊急防呆恢復"
+            textSize = 16f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface))
+        }
+        val desc = TextView(this).apply {
+            text = "若發現 Google 相簿長時間無法上傳或卡住，點擊下方按鈕可立即強制解除封鎖並恢復連線。"
+            textSize = 13f
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface_muted))
+            setPadding(0, dp(4), 0, dp(12))
+        }
+        val btnFailsafe = MaterialButton(this).apply {
+            text = "立即恢復 Google 相簿上傳與連線"
+            textSize = 15f
+            setTypeface(null, Typeface.BOLD)
+            cornerRadius = dp(12)
+            backgroundTintList = ColorStateList.valueOf(
+                ContextCompat.getColor(this@MainActivity, R.color.failsafe_bg)
+            )
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.failsafe_fg))
+            setPadding(dp(16), dp(14), dp(16), dp(14))
+            setOnClickListener {
+                sendBroadcast(Intent(CameraGuardService.ACTION_FORCE_RESTORE).setPackage(packageName))
+                val ok = ShizukuNetHelper.setPhotosNetworkBlocked(
+                    this@MainActivity,
+                    false,
+                    "使用者點擊緊急防呆按鈕，強制恢復 Google 相簿上傳與連線"
+                )
+                GuardStateManager.addLog(
+                    this@MainActivity,
+                    if (ok) GuardStateManager.LogCategory.MANUAL_RESTORE else GuardStateManager.LogCategory.RESTORE_FAIL,
+                    if (ok) "防呆恢復已執行" else "防呆恢復失敗",
+                    if (ok) "已清除算圖鎖定並恢復 Google 相簿網路連線" else "請確認 Shizuku 已啟動且授權"
+                )
+                Toast.makeText(
+                    this@MainActivity,
+                    if (ok) "已恢復 Google 相簿網路連線" else "恢復失敗，請檢查 Shizuku 權限",
+                    Toast.LENGTH_SHORT
+                ).show()
+                updateUI()
+            }
+        }
+
+        inner.addView(title)
+        inner.addView(desc)
+        inner.addView(btnFailsafe)
+        card.addView(inner)
+        return card
+    }
+
+    private fun buildStatusAndNotifyCard(): MaterialCardView {
+        val card = createCard()
+        val inner = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+        }
+
+        val header = TextView(this).apply {
+            text = "運作狀態與通知設定"
+            textSize = 16f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface))
+            setPadding(0, 0, 0, dp(12))
+        }
+
+        shizukuBadge = createBadgeView()
+        networkBadge = createBadgeView()
+
+        val badgeRow = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        badgeRow.addView(shizukuBadge)
+        badgeRow.addView(networkBadge)
+
+        val switchRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(12), 0, 0)
+        }
+        val switchLabelBox = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        val switchTitle = TextView(this).apply {
+            text = "延遲上傳與算圖完成通知"
+            textSize = 15f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface))
+        }
+        val switchSub = TextView(this).apply {
+            text = "顯示是否正在延遲 Google 相簿上傳，以及算圖完畢恢復連線的通知"
+            textSize = 12f
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface_muted))
+        }
+        switchLabelBox.addView(switchTitle)
+        switchLabelBox.addView(switchSub)
+
+        notifySwitch = MaterialSwitch(this).apply {
+            isChecked = GuardStateManager.isNotificationEnabled(this@MainActivity)
+            setOnCheckedChangeListener { _, isChecked ->
+                if (isChecked && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    if (ContextCompat.checkSelfPermission(
+                            this@MainActivity,
+                            Manifest.permission.POST_NOTIFICATIONS
+                        ) != PackageManager.PERMISSION_GRANTED
+                    ) {
+                        ActivityCompat.requestPermissions(
+                            this@MainActivity,
+                            arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                            102
+                        )
+                    }
+                }
+                GuardStateManager.setNotificationEnabled(this@MainActivity, isChecked)
+            }
+        }
+
+        switchRow.addView(switchLabelBox)
+        switchRow.addView(notifySwitch)
+
+        // 延遲恢復上傳時間設定
+        val delaySection = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, dp(16), 0, 0)
+        }
+        val delayTitle = TextView(this).apply {
+            text = "延遲恢復 Google 相簿上傳時間"
+            textSize = 15f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface))
+        }
+        delayValueText = TextView(this).apply {
+            textSize = 13f
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_primary))
+            setPadding(0, dp(4), 0, dp(4))
+        }
+        delaySlider = Slider(this).apply {
+            valueFrom = 30f
+            valueTo = 180f
+            stepSize = 5f
+            value = GuardStateManager.getRestoreDelaySec(this@MainActivity).toFloat()
+            addOnChangeListener { _, value, fromUser ->
+                if (fromUser) {
+                    GuardStateManager.setRestoreDelaySec(this@MainActivity, value.toInt())
+                }
+            }
+        }
+        val presetRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, dp(4), 0, 0)
+        }
+        for (sec in listOf(30, 45, 60, 120)) {
+            val btn = MaterialButton(
+                this,
+                null,
+                com.google.android.material.R.attr.materialButtonOutlinedStyle
+            ).apply {
+                text = if (sec == 30) "${sec}秒(預設)" else "${sec}秒"
+                textSize = 12f
+                cornerRadius = dp(8)
+                setPadding(dp(4), 0, dp(4), 0)
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                    marginEnd = dp(4)
+                }
+                setOnClickListener {
+                    GuardStateManager.setRestoreDelaySec(this@MainActivity, sec)
+                }
+            }
+            presetRow.addView(btn)
+        }
+        val delayNote = TextView(this).apply {
+            text = "須離開相機且全部照片算圖完成（>= 1MB、無暫存檔）後，再靜置達設定秒數（至少 30 秒）才恢復上傳；中途再開相機或拍照將重新判定。"
+            textSize = 11f
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface_muted))
+            setPadding(0, dp(6), 0, 0)
+        }
+        delaySection.addView(delayTitle)
+        delaySection.addView(delayValueText)
+        delaySection.addView(delaySlider)
+        delaySection.addView(presetRow)
+        delaySection.addView(delayNote)
+
+        inner.addView(header)
+        inner.addView(badgeRow)
+        inner.addView(switchRow)
+        inner.addView(delaySection)
+        card.addView(inner)
+        return card
+    }
+    private fun buildSetupCard(): MaterialCardView {
         val card = createCard()
         val inner = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -192,7 +502,6 @@ package com.guard.photosync    private fun buildSetupCard(): MaterialCardView {
             Toast.makeText(this, "無法開啟連結：$url", Toast.LENGTH_SHORT).show()
         }
     }
-
     private fun buildLogCard(): MaterialCardView {
         val card = createCard()
         val inner = LinearLayout(this).apply {
