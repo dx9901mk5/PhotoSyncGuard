@@ -1,6 +1,11 @@
 package com.guard.photosync
 
 import android.accessibilityservice.AccessibilityService
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.Build
 import android.os.Environment
 import android.os.FileObserver
 import android.os.Handler
@@ -12,12 +17,16 @@ import java.io.File
 class CameraGuardService : AccessibilityService() {
     companion object {
         private const val TAG = "CameraGuardService"
+        const val ACTION_FORCE_RESTORE = "com.guard.photosync.ACTION_FORCE_RESTORE"
+
         private val CAMERA_PACKAGES = setOf(
             "com.android.camera",
             "com.oplus.camera",
             "com.oneplus.camera",
             "com.google.android.GoogleCamera",
-            "com.sec.android.app.camera"
+            "com.sec.android.app.camera",
+            "com.vivo.camera",
+            "com.huawei.camera"
         )
         // 1MB 門檻 (1024 * 1024 bytes)
         private const val MIN_FINISHED_FILE_SIZE_BYTES = 1048576L
@@ -32,17 +41,46 @@ class CameraGuardService : AccessibilityService() {
     private var hasUnfinishedSmallPhoto = false
     private var fileObserver: FileObserver? = null
 
+    private val forceRestoreReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == ACTION_FORCE_RESTORE) {
+                handler.removeCallbacks(restoreNetworkRunnable)
+                hasUnfinishedSmallPhoto = false
+                isCameraInForeground = false
+                Log.i(TAG, "收到手動防呆恢復指令，已清除計時器與小圖鎖定")
+            }
+        }
+    }
+
     private val restoreNetworkRunnable = Runnable {
         if (!isCameraInForeground && ShizukuNetHelper.isBlocked) {
-            Log.i(TAG, "滿足恢復條件（成片已達標或已達安全閒置時限），恢復 Google 相簿網路")
+            val reason = if (hasUnfinishedSmallPhoto) {
+                "已達安全閒置時限（35秒無寫入），強制恢復 Google 相簿網路"
+            } else {
+                "相機算圖完成並已離開相機，恢復 Google 相簿網路"
+            }
+            Log.i(TAG, reason)
             hasUnfinishedSmallPhoto = false
-            ShizukuNetHelper.setPhotosNetworkBlocked(this, false)
+            ShizukuNetHelper.setPhotosNetworkBlocked(this, false, reason)
         }
     }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
         Log.i(TAG, "無障礙服務已啟動，開始監控相機與檔案大小門檻")
+        val filter = IntentFilter(ACTION_FORCE_RESTORE)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(forceRestoreReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            registerReceiver(forceRestoreReceiver, filter)
+        }
+        GuardStateManager.addLog(
+            this,
+            GuardStateManager.LogCategory.INFO,
+            "守護服務已啟動",
+            "開始監控前景相機與 /DCIM/Camera/ 檔案大小（門檻 1MB）"
+        )
         startDcimObserver()
     }
 
@@ -55,7 +93,7 @@ class CameraGuardService : AccessibilityService() {
                 handler.removeCallbacks(restoreNetworkRunnable)
                 if (!ShizukuNetHelper.isBlocked) {
                     Log.i(TAG, "偵測到相機開啟 ($pkgName)，立即切斷 Google 相簿網路")
-                    ShizukuNetHelper.setPhotosNetworkBlocked(this, true)
+                    ShizukuNetHelper.setPhotosNetworkBlocked(this, true, "偵測到相機開啟 ($pkgName)")
                 }
             } else {
                 if (isCameraInForeground) {
@@ -89,14 +127,29 @@ class CameraGuardService : AccessibilityService() {
                     val file = File(cameraDir, path)
                     if (file.exists()) {
                         val fileSize = file.length()
+                        val sizeKb = fileSize / 1024
                         if (fileSize in 1 until MIN_FINISHED_FILE_SIZE_BYTES) {
                             // 檔案小於 1MB：認定為尚未算完的低畫質預覽圖
+                            if (!hasUnfinishedSmallPhoto) {
+                                GuardStateManager.addLog(
+                                    this@CameraGuardService,
+                                    GuardStateManager.LogCategory.PHOTO_WAIT,
+                                    "偵測到未算完小圖 (< 1MB)",
+                                    "$path (${sizeKb} KB)，強制保持斷網等待算圖"
+                                )
+                            }
                             hasUnfinishedSmallPhoto = true
-                            ensureNetworkBlocked("偵測到小於 1MB 的未算完照片 ($path, ${fileSize / 1024} KB)，強制保持斷網")
+                            ensureNetworkBlocked("偵測到小於 1MB 的未算完照片 ($path, ${sizeKb} KB)")
                         } else if (fileSize >= MIN_FINISHED_FILE_SIZE_BYTES) {
                             // 檔案 >= 1MB：認定為算圖完成並已覆寫為完整成片
                             if (hasUnfinishedSmallPhoto) {
-                                Log.i(TAG, "照片已算圖完成並覆寫 ($path, ${fileSize / 1024} KB)，解除小圖鎖定")
+                                Log.i(TAG, "照片已算圖完成並覆寫 ($path, ${sizeKb} KB)，解除小圖鎖定")
+                                GuardStateManager.addLog(
+                                    this@CameraGuardService,
+                                    GuardStateManager.LogCategory.PHOTO_READY,
+                                    "判讀照片算圖完成 (>= 1MB)",
+                                    "$path (${sizeKb} KB)，準備恢復 Google 相簿網路"
+                                )
                             }
                             hasUnfinishedSmallPhoto = false
                             if (ShizukuNetHelper.isBlocked || isCameraInForeground) {
@@ -113,7 +166,9 @@ class CameraGuardService : AccessibilityService() {
     private fun ensureNetworkBlocked(reason: String) {
         Log.d(TAG, reason)
         if (!ShizukuNetHelper.isBlocked) {
-            ShizukuNetHelper.setPhotosNetworkBlocked(this, true)
+            ShizukuNetHelper.setPhotosNetworkBlocked(this, true, reason)
+        } else {
+            GuardStateManager.notifyDelaying(this, reason)
         }
         scheduleRestoreCheck()
     }
@@ -131,10 +186,11 @@ class CameraGuardService : AccessibilityService() {
 
     override fun onDestroy() {
         super.onDestroy()
+        runCatching { unregisterReceiver(forceRestoreReceiver) }
         fileObserver?.stopWatching()
         handler.removeCallbacks(restoreNetworkRunnable)
         if (ShizukuNetHelper.isBlocked) {
-            ShizukuNetHelper.setPhotosNetworkBlocked(this, false)
+            ShizukuNetHelper.setPhotosNetworkBlocked(this, false, "無障礙服務停止，自動恢復網路")
         }
     }
 }
