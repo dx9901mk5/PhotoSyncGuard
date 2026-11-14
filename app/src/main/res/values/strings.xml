@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">PhotoSyncGuard</string>
+    <string name="toolbar_subtitle">Delay Google Photos backup during camera processing</string>
+
+    <string name="failsafe_title">Emergency Failsafe Restore</string>
+    <string name="failsafe_desc">If Google Photos appears stuck or cannot upload for a long time, tap below to immediately unblock and restore its network connection.</string>
+    <string name="failsafe_btn">Restore Google Photos Upload &amp; Network Now</string>
+    <string name="failsafe_toast_ok">Google Photos network restored</string>
+    <string name="failsafe_toast_fail">Restore failed. Please check Shizuku permission</string>
+    <string name="failsafe_log_ok_title">Failsafe Restore Executed</string>
+    <string name="failsafe_log_fail_title">Failsafe Restore Failed</string>
+    <string name="failsafe_log_ok_detail">Cleared processing lock and restored Google Photos network</string>
+    <string name="failsafe_log_fail_detail">Please ensure Shizuku is running and authorized</string>
+    <string name="failsafe_reason">User tapped emergency failsafe button to force restore Google Photos network</string>
+
+    <string name="status_notify_title">Status &amp; Notification Settings</string>
+    <string name="badge_shizuku_ok">✅ Shizuku Permission: Authorized</string>
+    <string name="badge_shizuku_no">❌ Shizuku Permission: Not Authorized</string>
+    <string name="badge_net_blocked">⏳ Google Photos Network: Blocked (Waiting for processing)</string>
+    <string name="badge_net_normal">🟢 Google Photos Network: Online &amp; Ready to Sync</string>
+
+    <string name="notify_switch_title">Delay &amp; Completion Notifications</string>
+    <string name="notify_switch_sub">Show notifications when delaying Google Photos upload and when restored after processing</string>
+
+    <string name="delay_title">Restore Upload Delay Time</string>
+    <string name="delay_value_fmt">Current: Wait %1$d s after leaving camera &amp; processing completes</string>
+    <string name="delay_preset_default">%1$ds (Default)</string>
+    <string name="delay_preset">%1$ds</string>
+    <string name="delay_note">Waits until you leave the camera and ALL photos finish processing (&gt;= 1MB, no temp files), plus the configured delay (min 30s). Reopening camera or taking another photo resets the timer.</string>
+
+    <string name="setup_title">Setup &amp; Diagnostics</string>
+    <string name="setup_hint">⚠️ Please enable Auto-start and Allow Background High Power Usage in system settings so the OS does not kill this app.</string>
+    <string name="btn_shizuku">1. Authorize Shizuku</string>
+    <string name="btn_storage">2. Grant Media Read Permission</string>
+    <string name="btn_accessibility">3. Enable Accessibility Service (Detect Camera)</string>
+    <string name="btn_test_block">Test: Manually Block Google Photos Network</string>
+    <string name="toast_shizuku_granted">Shizuku authorized</string>
+    <string name="toast_shizuku_already">Shizuku permission already granted</string>
+    <string name="toast_shizuku_not_running">Please start the Shizuku service first</string>
+    <string name="test_block_reason">User manual block test</string>
+
+    <string name="about_update_title">About &amp; Updates</string>
+    <string name="about_version_fmt">Current version: v%1$s (Automatically checks GitHub for APK updates on launch)</string>
+    <string name="btn_about">About / GitHub</string>
+    <string name="btn_check_update">Check APK Update</string>
+    <string name="about_dialog_title">About PhotoSyncGuard v%1$s</string>
+    <string name="about_dialog_msg">A rootless companion app (requires Shizuku) built for OPPO, vivo, and Xiaomi (Global &amp; CN ROMs) to prevent Google Photos from prematurely uploading unfinished preview photos during camera processing.\n\nP.S. vivo Global ROM OriginOS 7 (Android 17) already includes a built-in fix and can skip this app.\n\nGitHub:\n%1$s</string>
+    <string name="btn_open_github">Open GitHub</string>
+    <string name="btn_close">Close</string>
+
+    <string name="toast_checking_update">Checking GitHub for latest release…</string>
+    <string name="update_found_title">New Version v%1$s Available</string>
+    <string name="update_found_msg">Current: v%1$s\nLatest: v%2$s\n\n%3$s</string>
+    <string name="update_default_notes">A new signed APK is available and can be installed directly over the current version.</string>
+    <string name="btn_download_apk">Download Update APK</string>
+    <string name="btn_view_release">View Release Page</string>
+    <string name="btn_later">Later</string>
+    <string name="toast_up_to_date">You are on the latest version (v%1$s)</string>
+    <string name="toast_update_failed">Update check failed: %1$s</string>
+    <string name="toast_cannot_open_url">Unable to open link: %1$s</string>
+
+    <string name="log_card_title">24-Hour Activity Log</string>
+    <string name="btn_clear">Clear</string>
+    <string name="log_count_fmt">Retains blocking, processing checks, and restore events from the last 24 hours (%1$d entries; older logs auto-purged)</string>
+    <string name="log_empty">No activity logs in the last 24 hours.</string>
+
+    <string name="notif_channel_name">Google Photos Delay Status</string>
+    <string name="notif_channel_desc">Shows whether Google Photos upload is currently delayed or restored after camera processing</string>
+    <string name="notif_delay_title">⏳ Delaying Google Photos Upload</string>
+    <string name="notif_delay_big_fmt">%1$s\nNetwork will automatically restore once camera processing completes (&gt;= 1MB).</string>
+    <string name="notif_restored_title">✅ Processing Complete — Google Photos Restored</string>
+</resources>
