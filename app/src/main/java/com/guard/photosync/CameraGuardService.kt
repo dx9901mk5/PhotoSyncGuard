@@ -52,35 +52,37 @@ class CameraGuardService : AccessibilityService() {
                 isCameraInForeground = false
                 Log.i(TAG, "收到手動防呆恢復指令，已清除計時器與小圖鎖定")
             }
-        }
+        } 
     }
 
-    private val restoreNetworkRunnable: Runnable = Runnable {
-        if (!isCameraInForeground && ShizukuNetHelper.isBlocked) {
-            val unfinishedFile = findUnfinishedFileInCameraDir()
-            val idleSinceLastEvent = System.currentTimeMillis() - lastFileEventTimeMs
-            if (unfinishedFile != null && idleSinceLastEvent < SAFETY_TIMEOUT_MS) {
-                Log.i(TAG, "偵測到仍有未完成檔案 ($unfinishedFile)，繼續延遲恢復網路")
-                GuardStateManager.addLog(
-                    this,
-                    GuardStateManager.LogCategory.PHOTO_WAIT,
-                    "仍有暫存或未算完檔案，繼續阻斷",
-                    "$unfinishedFile 尚未消失或達 1MB，延後恢復網路"
-                )
-                GuardStateManager.notifyDelaying(this, "等待 $unfinishedFile 算圖完成…")
-                handler.postDelayed(restoreNetworkRunnable, 3000L)
-                return@Runnable
-            }
+    private val restoreNetworkRunnable: Runnable = object : Runnable {
+        override fun run() {
+            if (!isCameraInForeground && ShizukuNetHelper.isBlocked) {
+                val unfinishedFile = findUnfinishedFileInCameraDir()
+                val idleSinceLastEvent = System.currentTimeMillis() - lastFileEventTimeMs
+                if (unfinishedFile != null && idleSinceLastEvent < SAFETY_TIMEOUT_MS) {
+                    Log.i(TAG, "偵測到仍有未完成檔案 ($unfinishedFile)，繼續延遲恢復網路")
+                    GuardStateManager.addLog(
+                        this@CameraGuardService,
+                        GuardStateManager.LogCategory.PHOTO_WAIT,
+                        "仍有暫存或未算完檔案，繼續阻斷",
+                        "$unfinishedFile 尚未消失或達 1MB，延後恢復網路"
+                    )
+                    GuardStateManager.notifyDelaying(this@CameraGuardService, "等待 $unfinishedFile 算圖完成…")
+                    handler.postDelayed(this, 3000L)
+                    return
+                }
 
-            val delaySec = GuardStateManager.getRestoreDelaySec(this)
-            val reason = if (unfinishedFile != null || hasUnfinishedSmallPhoto) {
-                "已達安全閒置時限（35秒無寫入），強制恢復 Google 相簿網路"
-            } else {
-                "相機算圖完成並已離開相機（延遲 ${delaySec} 秒緩衝），恢復 Google 相簿網路"
+                val delaySec = GuardStateManager.getRestoreDelaySec(this@CameraGuardService)
+                val reason = if (unfinishedFile != null || hasUnfinishedSmallPhoto) {
+                    "已達安全閒置時限（35秒無寫入），強制恢復 Google 相簿網路"
+                } else {
+                    "相機算圖完成並已離開相機（延遲 ${delaySec} 秒緩衝），恢復 Google 相簿網路"
+                }
+                Log.i(TAG, reason)
+                hasUnfinishedSmallPhoto = false
+                ShizukuNetHelper.setPhotosNetworkBlocked(this@CameraGuardService, false, reason)
             }
-            Log.i(TAG, reason)
-            hasUnfinishedSmallPhoto = false
-            ShizukuNetHelper.setPhotosNetworkBlocked(this, false, reason)
         }
     }
 
