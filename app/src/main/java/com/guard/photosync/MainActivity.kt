@@ -22,6 +22,7 @@ import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.materialswitch.MaterialSwitch
+import com.google.android.material.slider.Slider
 import rikka.shizuku.Shizuku
 
 class MainActivity : AppCompatActivity() {
@@ -29,6 +30,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var shizukuBadge: TextView
     private lateinit var networkBadge: TextView
     private lateinit var notifySwitch: MaterialSwitch
+    private lateinit var delayValueText: TextView
+    private lateinit var delaySlider: Slider
     private lateinit var logContainer: LinearLayout
     private lateinit var logCountText: TextView
 
@@ -228,9 +231,72 @@ class MainActivity : AppCompatActivity() {
         switchRow.addView(switchLabelBox)
         switchRow.addView(notifySwitch)
 
+        // 延遲恢復上傳時間設定
+        val delaySection = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, dp(16), 0, 0)
+        }
+        val delayTitle = TextView(this).apply {
+            text = "延遲恢復 Google 相簿上傳時間"
+            textSize = 15f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface))
+        }
+        delayValueText = TextView(this).apply {
+            textSize = 13f
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_primary))
+            setPadding(0, dp(4), 0, dp(4))
+        }
+        delaySlider = Slider(this).apply {
+            valueFrom = 0f
+            valueTo = 30f
+            stepSize = 1f
+            value = GuardStateManager.getRestoreDelaySec(this@MainActivity).toFloat()
+            addOnChangeListener { _, value, fromUser ->
+                if (fromUser) {
+                    GuardStateManager.setRestoreDelaySec(this@MainActivity, value.toInt())
+                }
+            }
+        }
+        val presetRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, dp(4), 0, 0)
+        }
+        for (sec in listOf(3, 5, 10, 15)) {
+            val btn = MaterialButton(
+                this,
+                null,
+                com.google.android.material.R.attr.materialButtonOutlinedStyle
+            ).apply {
+                text = if (sec == 5) "${sec}秒(預設)" else "${sec}秒"
+                textSize = 12f
+                cornerRadius = dp(8)
+                setPadding(dp(4), 0, dp(4), 0)
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                    marginEnd = dp(4)
+                }
+                setOnClickListener {
+                    GuardStateManager.setRestoreDelaySec(this@MainActivity, sec)
+                }
+            }
+            presetRow.addView(btn)
+        }
+        val delayNote = TextView(this).apply {
+            text = "極端小圖 (< 1MB) 仍保有 35 秒無寫入安全兜底自動恢復。"
+            textSize = 11f
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface_muted))
+            setPadding(0, dp(6), 0, 0)
+        }
+        delaySection.addView(delayTitle)
+        delaySection.addView(delayValueText)
+        delaySection.addView(delaySlider)
+        delaySection.addView(presetRow)
+        delaySection.addView(delayNote)
+
         inner.addView(header)
         inner.addView(badgeRow)
         inner.addView(switchRow)
+        inner.addView(delaySection)
         card.addView(inner)
         return card
     }
@@ -381,6 +447,12 @@ class MainActivity : AppCompatActivity() {
         )
 
         notifySwitch.isChecked = GuardStateManager.isNotificationEnabled(this)
+
+        val delaySec = GuardStateManager.getRestoreDelaySec(this)
+        delayValueText.text = "目前設定：算圖完成且離開相機後，延遲 $delaySec 秒恢復上傳"
+        if (delaySlider.value.toInt() != delaySec) {
+            delaySlider.value = delaySec.toFloat()
+        }
 
         val logs = GuardStateManager.getLogs(this)
         logCountText.text = "自動保留最近 24 小時內的阻擋、算圖判讀與恢復紀錄（目前 ${logs.size} 筆，逾時自動移除）"
