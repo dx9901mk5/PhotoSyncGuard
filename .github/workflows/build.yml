@@ -23,20 +23,20 @@ jobs:
       - name: Build Release APK
         run: gradle assembleRelease
       - name: Prepare APK
-        run: cp app/build/outputs/apk/release/app-release.apk PhotoSyncGuard-v1.0.4.apk
+        run: cp app/build/outputs/apk/release/app-release.apk PhotoSyncGuard-v1.0.5.apk
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: PhotoSyncGuard-APK
-          path: PhotoSyncGuard-v1.0.4.apk
-      - name: Publish GitHub Release v1.0.4
+          path: PhotoSyncGuard-v1.0.5.apk
+      - name: Publish GitHub Release v1.0.5
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if gh release view v1.0.4 >/dev/null 2>&1; then
-            gh release upload v1.0.4 PhotoSyncGuard-v1.0.4.apk --clobber
+          if gh release view v1.0.5 >/dev/null 2>&1; then
+            gh release upload v1.0.5 PhotoSyncGuard-v1.0.5.apk --clobber
           else
-            gh release create v1.0.4 PhotoSyncGuard-v1.0.4.apk \
-              --title "PhotoSyncGuard v1.0.4" \
-              --notes "修復暫存檔尚未清除前就提早恢復 Google 相簿網路的問題：1) 暫存檔 (.pending/.tmp) 強制鎖定阻斷 2) 恢復網路前全目錄掃描確認無近期暫存檔與 < 1MB 照片 3) 補齊 OPPO/小米相機套件名稱。"
+            gh release create v1.0.5 PhotoSyncGuard-v1.0.5.apk \
+              --title "PhotoSyncGuard v1.0.5" \
+              --notes "強化拍攝工作階段全盤判定：1) 延遲恢復緩衝至少 30 秒起跳（支援 30~180 秒調整） 2) 追蹤拍攝期間所有照片與暫存檔，必須全部計算完畢且中途不再使用相機才會恢復網路 3) 最長容忍 5 分鐘算圖等待。"
           fi
