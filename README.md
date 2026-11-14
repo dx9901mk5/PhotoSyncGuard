@@ -9,6 +9,8 @@
 ### 專案目的
 專為 **OPPO（ColorOS）、vivo（OriginOS / FuntouchOS）與小米（HyperOS）的全球版及中國版 ROM** 打造的免 Root Android 守護工具。
 
+> **系統版本備註**：**vivo 國際版 OriginOS 7（基於 Android 17）** 已於系統層內建修復此問題，使用該版本系統的用戶可忽略、無需安裝本工具。
+
 解決手機在進行多幀合成、HDR 或夜景算圖時，**Google 相簿過早抓取並上傳未算圖完成的低畫質預覽圖（半成品），且在手機完成最終高品質成片覆寫後，Google 相簿不會再次觸發重新上傳**的問題。
 
 ### 核心機制
@@ -23,6 +25,8 @@
 
 ### Purpose
 A rootless Android companion app built for **OPPO (ColorOS), vivo (OriginOS / FuntouchOS), and Xiaomi (HyperOS) — both Global and CN ROMs**.
+
+> **OS Note**: **vivo Global ROM OriginOS 7 (Android 17)** already includes a built-in fix for this issue—users on OriginOS 7 Global can skip this app.
 
 It solves the issue where **Google Photos prematurely grabs and backs up unfinished low-resolution preview photos during multi-frame / HDR / Night computational photography, and fails to re-upload the final full-quality photo after the camera engine finishes processing and overwrites the file**.
 
