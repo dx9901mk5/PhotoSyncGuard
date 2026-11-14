@@ -41,6 +41,7 @@ class MainActivity : AppCompatActivity() {
         updateUI()
         if (grantResult == PackageManager.PERMISSION_GRANTED) {
             Toast.makeText(this, getString(R.string.toast_shizuku_granted), Toast.LENGTH_SHORT).show()
+            runShizukuGrantAll()
         }
     }
 
@@ -324,6 +325,30 @@ class MainActivity : AppCompatActivity() {
             setPadding(0, 0, 0, dp(12))
         }
 
+        val btnGrantAllShizuku = MaterialButton(this).apply {
+            text = getString(R.string.btn_grant_all_shizuku)
+            textSize = 14f
+            setTypeface(null, Typeface.BOLD)
+            cornerRadius = dp(12)
+            backgroundTintList = ColorStateList.valueOf(
+                ContextCompat.getColor(this@MainActivity, R.color.md_primary_container)
+            )
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_primary_container))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = dp(10) }
+            setOnClickListener {
+                if (!Shizuku.pingBinder()) {
+                    Toast.makeText(this@MainActivity, getString(R.string.toast_shizuku_not_running), Toast.LENGTH_SHORT).show()
+                } else if (Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) {
+                    Shizuku.requestPermission(100)
+                } else {
+                    runShizukuGrantAll()
+                }
+            }
+        }
+
         val btnShizuku = createActionButton(getString(R.string.btn_shizuku)) {
             if (Shizuku.pingBinder()) {
                 if (Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) {
@@ -372,12 +397,39 @@ class MainActivity : AppCompatActivity() {
 
         inner.addView(header)
         inner.addView(hint)
+        inner.addView(btnGrantAllShizuku)
         inner.addView(btnShizuku)
         inner.addView(btnStorage)
         inner.addView(btnAccessibility)
         inner.addView(btnTestBlock)
         card.addView(inner)
         return card
+    }
+
+    private fun runShizukuGrantAll() {
+        Thread {
+            val report = ShizukuNetHelper.grantAllPermissionsViaShizuku(this)
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                if (report == null) {
+                    Toast.makeText(this, getString(R.string.toast_shizuku_not_running), Toast.LENGTH_SHORT).show()
+                } else {
+                    val mark = { ok: Boolean -> if (ok) "✅" else "⚠️" }
+                    Toast.makeText(
+                        this,
+                        getString(
+                            R.string.toast_grant_all_result,
+                            mark(report.mediaGranted),
+                            mark(report.notificationGranted),
+                            mark(report.accessibilityGranted),
+                            mark(report.batteryWhitelistGranted)
+                        ),
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+                updateUI()
+            }
+        }.start()
     }
 
     private fun buildAboutAndUpdateCard(): MaterialCardView {
