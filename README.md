@@ -6,9 +6,13 @@
 
 ## 介面預覽 / Screenshots
 
-| 主畫面與狀態控制 / Main & Controls | 權限引導與 24 小時紀錄 / Setup & 24h Logs |
+| 繁體中文（主畫面與狀態控制） | 繁體中文（權限引導與 24 小時紀錄） |
 | :---: | :---: |
-| <img src="docs/screenshots/screenshot_1.jpg" width="280" alt="PhotoSyncGuard Main Controls" /> | <img src="docs/screenshots/screenshot_2.jpg" width="280" alt="PhotoSyncGuard Setup and Logs" /> |
+| <img src="docs/screenshots/screenshot_1.jpg" width="260" alt="PhotoSyncGuard Main Controls (ZH)" /> | <img src="docs/screenshots/screenshot_2.jpg" width="260" alt="PhotoSyncGuard Setup and Logs (ZH)" /> |
+
+| English (Main & Controls) | English (Setup & 24h Logs) |
+| :---: | :---: |
+| <img src="docs/screenshots/screenshot_en_1.jpg" width="260" alt="PhotoSyncGuard Main Controls (EN)" /> | <img src="docs/screenshots/screenshot_en_2.jpg" width="260" alt="PhotoSyncGuard Setup and Logs (EN)" /> |
 
 ---
 
