@@ -23,20 +23,20 @@ jobs:
       - name: Build Release APK
         run: gradle assembleRelease
       - name: Prepare APK
-        run: cp app/build/outputs/apk/release/app-release.apk PhotoSyncGuard-v1.0.5.apk
+        run: cp app/build/outputs/apk/release/app-release.apk PhotoSyncGuard-v1.0.6.apk
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: PhotoSyncGuard-APK
-          path: PhotoSyncGuard-v1.0.5.apk
-      - name: Publish GitHub Release v1.0.5
+          path: PhotoSyncGuard-v1.0.6.apk
+      - name: Publish GitHub Release v1.0.6
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if gh release view v1.0.5 >/dev/null 2>&1; then
-            gh release upload v1.0.5 PhotoSyncGuard-v1.0.5.apk --clobber
+          if gh release view v1.0.6 >/dev/null 2>&1; then
+            gh release upload v1.0.6 PhotoSyncGuard-v1.0.6.apk --clobber
           else
-            gh release create v1.0.5 PhotoSyncGuard-v1.0.5.apk \
-              --title "PhotoSyncGuard v1.0.5" \
-              --notes "強化拍攝工作階段全盤判定：1) 延遲恢復緩衝至少 30 秒起跳（支援 30~180 秒調整） 2) 追蹤拍攝期間所有照片與暫存檔，必須全部計算完畢且中途不再使用相機才會恢復網路 3) 最長容忍 5 分鐘算圖等待。"
+            gh release create v1.0.6 PhotoSyncGuard-v1.0.6.apk \
+              --title "PhotoSyncGuard v1.0.6" \
+              --notes "新增英文（English）與簡體中文（简体中文）介面支援，隨系統語言自動切換；並於 GitHub README 補上實機截圖與免 Root / 必須使用 Shizuku 說明。"
           fi
