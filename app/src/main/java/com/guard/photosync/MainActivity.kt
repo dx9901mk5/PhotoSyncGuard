@@ -40,7 +40,7 @@ class MainActivity : AppCompatActivity() {
     private val permissionListener = Shizuku.OnRequestPermissionResultListener { _, grantResult ->
         updateUI()
         if (grantResult == PackageManager.PERMISSION_GRANTED) {
-            Toast.makeText(this, "Shizuku 授權成功", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.toast_shizuku_granted), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -63,8 +63,8 @@ class MainActivity : AppCompatActivity() {
         }
 
         val toolbar = MaterialToolbar(this).apply {
-            title = "PhotoSyncGuard"
-            subtitle = "相機算圖期間延遲 Google 相簿備份"
+            title = getString(R.string.app_name)
+            subtitle = getString(R.string.toolbar_subtitle)
             setTitleTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface))
             setSubtitleTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface_muted))
             setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.md_surface))
@@ -85,26 +85,16 @@ class MainActivity : AppCompatActivity() {
             setPadding(dp(16), dp(16), dp(16), dp(24))
         }
 
-        // 1. 最上方：緊急防呆按鈕（立即恢復 Google 相簿上傳與連線功能）
         content.addView(buildFailsafeCard())
-
-        // 2. 系統狀態與通知開關卡片
         content.addView(buildStatusAndNotifyCard())
-
-        // 3. 權限設定與手動測試卡片
         content.addView(buildSetupCard())
-
-        // 4. 關於我、GitHub 專案與 APK 自動檢查更新卡片
         content.addView(buildAboutAndUpdateCard())
-
-        // 5. 最下方：24 小時處理過程與阻擋/恢復紀錄
         content.addView(buildLogCard())
 
         scrollView.addView(content)
         root.addView(scrollView)
         setContentView(root)
 
-        // 啟動時自動檢查 GitHub 是否有新版本 APK
         checkAppUpdate(manual = false)
     }
 
@@ -119,19 +109,19 @@ class MainActivity : AppCompatActivity() {
         }
 
         val title = TextView(this).apply {
-            text = "緊急防呆恢復"
+            text = getString(R.string.failsafe_title)
             textSize = 16f
             setTypeface(null, Typeface.BOLD)
             setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface))
         }
         val desc = TextView(this).apply {
-            text = "若發現 Google 相簿長時間無法上傳或卡住，點擊下方按鈕可立即強制解除封鎖並恢復連線。"
+            text = getString(R.string.failsafe_desc)
             textSize = 13f
             setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface_muted))
             setPadding(0, dp(4), 0, dp(12))
         }
         val btnFailsafe = MaterialButton(this).apply {
-            text = "立即恢復 Google 相簿上傳與連線"
+            text = getString(R.string.failsafe_btn)
             textSize = 15f
             setTypeface(null, Typeface.BOLD)
             cornerRadius = dp(12)
@@ -145,17 +135,17 @@ class MainActivity : AppCompatActivity() {
                 val ok = ShizukuNetHelper.setPhotosNetworkBlocked(
                     this@MainActivity,
                     false,
-                    "使用者點擊緊急防呆按鈕，強制恢復 Google 相簿上傳與連線"
+                    getString(R.string.failsafe_reason)
                 )
                 GuardStateManager.addLog(
                     this@MainActivity,
                     if (ok) GuardStateManager.LogCategory.MANUAL_RESTORE else GuardStateManager.LogCategory.RESTORE_FAIL,
-                    if (ok) "防呆恢復已執行" else "防呆恢復失敗",
-                    if (ok) "已清除算圖鎖定並恢復 Google 相簿網路連線" else "請確認 Shizuku 已啟動且授權"
+                    getString(if (ok) R.string.failsafe_log_ok_title else R.string.failsafe_log_fail_title),
+                    getString(if (ok) R.string.failsafe_log_ok_detail else R.string.failsafe_log_fail_detail)
                 )
                 Toast.makeText(
                     this@MainActivity,
-                    if (ok) "已恢復 Google 相簿網路連線" else "恢復失敗，請檢查 Shizuku 權限",
+                    getString(if (ok) R.string.failsafe_toast_ok else R.string.failsafe_toast_fail),
                     Toast.LENGTH_SHORT
                 ).show()
                 updateUI()
@@ -177,7 +167,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         val header = TextView(this).apply {
-            text = "運作狀態與通知設定"
+            text = getString(R.string.status_notify_title)
             textSize = 16f
             setTypeface(null, Typeface.BOLD)
             setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface))
@@ -203,13 +193,13 @@ class MainActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
         val switchTitle = TextView(this).apply {
-            text = "延遲上傳與算圖完成通知"
+            text = getString(R.string.notify_switch_title)
             textSize = 15f
             setTypeface(null, Typeface.BOLD)
             setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface))
         }
         val switchSub = TextView(this).apply {
-            text = "顯示是否正在延遲 Google 相簿上傳，以及算圖完畢恢復連線的通知"
+            text = getString(R.string.notify_switch_sub)
             textSize = 12f
             setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface_muted))
         }
@@ -239,13 +229,12 @@ class MainActivity : AppCompatActivity() {
         switchRow.addView(switchLabelBox)
         switchRow.addView(notifySwitch)
 
-        // 延遲恢復上傳時間設定
         val delaySection = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(0, dp(16), 0, 0)
         }
         val delayTitle = TextView(this).apply {
-            text = "延遲恢復 Google 相簿上傳時間"
+            text = getString(R.string.delay_title)
             textSize = 15f
             setTypeface(null, Typeface.BOLD)
             setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface))
@@ -276,7 +265,11 @@ class MainActivity : AppCompatActivity() {
                 null,
                 com.google.android.material.R.attr.materialButtonOutlinedStyle
             ).apply {
-                text = if (sec == 30) "${sec}秒(預設)" else "${sec}秒"
+                text = if (sec == 30) {
+                    getString(R.string.delay_preset_default, sec)
+                } else {
+                    getString(R.string.delay_preset, sec)
+                }
                 textSize = 12f
                 cornerRadius = dp(8)
                 setPadding(dp(4), 0, dp(4), 0)
@@ -290,7 +283,7 @@ class MainActivity : AppCompatActivity() {
             presetRow.addView(btn)
         }
         val delayNote = TextView(this).apply {
-            text = "須離開相機且全部照片算圖完成（>= 1MB、無暫存檔）後，再靜置達設定秒數（至少 30 秒）才恢復上傳；中途再開相機或拍照將重新判定。"
+            text = getString(R.string.delay_note)
             textSize = 11f
             setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface_muted))
             setPadding(0, dp(6), 0, 0)
@@ -308,6 +301,7 @@ class MainActivity : AppCompatActivity() {
         card.addView(inner)
         return card
     }
+
     private fun buildSetupCard(): MaterialCardView {
         val card = createCard()
         val inner = LinearLayout(this).apply {
@@ -316,7 +310,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         val header = TextView(this).apply {
-            text = "權限引導與測試"
+            text = getString(R.string.setup_title)
             textSize = 16f
             setTypeface(null, Typeface.BOLD)
             setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface))
@@ -324,25 +318,25 @@ class MainActivity : AppCompatActivity() {
         }
 
         val hint = TextView(this).apply {
-            text = "⚠️ 請於系統設定開啟本 App 的「自啟動」與「允許背景高耗電」，避免拍到一半被系統回收。"
+            text = getString(R.string.setup_hint)
             textSize = 12f
             setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface_muted))
             setPadding(0, 0, 0, dp(12))
         }
 
-        val btnShizuku = createActionButton("1. 授權 Shizuku") {
+        val btnShizuku = createActionButton(getString(R.string.btn_shizuku)) {
             if (Shizuku.pingBinder()) {
                 if (Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) {
                     Shizuku.requestPermission(100)
                 } else {
-                    Toast.makeText(this, "已取得 Shizuku 權限", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, getString(R.string.toast_shizuku_already), Toast.LENGTH_SHORT).show()
                 }
             } else {
-                Toast.makeText(this, "請先啟動 Shizuku 服務", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.toast_shizuku_not_running), Toast.LENGTH_SHORT).show()
             }
         }
 
-        val btnStorage = createActionButton("2. 授權相簿目錄監聽 (讀取圖片權限)") {
+        val btnStorage = createActionButton(getString(R.string.btn_storage)) {
             val perm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 Manifest.permission.READ_MEDIA_IMAGES
             } else {
@@ -351,7 +345,7 @@ class MainActivity : AppCompatActivity() {
             ActivityCompat.requestPermissions(this, arrayOf(perm), 101)
         }
 
-        val btnAccessibility = createActionButton("3. 開啟無障礙服務 (偵測相機)") {
+        val btnAccessibility = createActionButton(getString(R.string.btn_accessibility)) {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
         }
 
@@ -360,14 +354,18 @@ class MainActivity : AppCompatActivity() {
             null,
             com.google.android.material.R.attr.materialButtonOutlinedStyle
         ).apply {
-            text = "測試：手動切斷 Google 相簿網路"
+            text = getString(R.string.btn_test_block)
             cornerRadius = dp(10)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply { topMargin = dp(6) }
             setOnClickListener {
-                ShizukuNetHelper.setPhotosNetworkBlocked(this@MainActivity, true, "使用者手動測試阻斷")
+                ShizukuNetHelper.setPhotosNetworkBlocked(
+                    this@MainActivity,
+                    true,
+                    getString(R.string.test_block_reason)
+                )
                 updateUI()
             }
         }
@@ -391,13 +389,13 @@ class MainActivity : AppCompatActivity() {
 
         val currentVersion = UpdateChecker.getCurrentVersionName(this)
         val header = TextView(this).apply {
-            text = "關於與版本更新"
+            text = getString(R.string.about_update_title)
             textSize = 16f
             setTypeface(null, Typeface.BOLD)
             setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface))
         }
         val versionDesc = TextView(this).apply {
-            text = "目前版本：v$currentVersion（開啟 App 時會自動檢查 GitHub 是否有新版 APK）"
+            text = getString(R.string.about_version_fmt, currentVersion)
             textSize = 12f
             setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface_muted))
             setPadding(0, dp(4), 0, dp(12))
@@ -407,7 +405,7 @@ class MainActivity : AppCompatActivity() {
             orientation = LinearLayout.HORIZONTAL
         }
         val btnAbout = MaterialButton(this).apply {
-            text = "關於我 / GitHub"
+            text = getString(R.string.btn_about)
             cornerRadius = dp(10)
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
                 marginEnd = dp(6)
@@ -419,7 +417,7 @@ class MainActivity : AppCompatActivity() {
             null,
             com.google.android.material.R.attr.materialButtonOutlinedStyle
         ).apply {
-            text = "檢查 APK 更新"
+            text = getString(R.string.btn_check_update)
             cornerRadius = dp(10)
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
                 marginStart = dp(6)
@@ -440,56 +438,53 @@ class MainActivity : AppCompatActivity() {
     private fun showAboutDialog() {
         val currentVersion = UpdateChecker.getCurrentVersionName(this)
         MaterialAlertDialogBuilder(this)
-            .setTitle("關於 PhotoSyncGuard v$currentVersion")
-            .setMessage(
-                """
-                專為 OPPO、vivo 與小米（全球版 / CN 版 ROM）設計的免 Root 守護工具，防止 Google 相簿在相機算圖完成前搶先上傳低畫質半成品。
-                
-                PS：vivo 國際版 OriginOS 7（基於 Android 17）已內建修復，可忽略不使用本工具。
-                
-                專案 GitHub：
-                ${UpdateChecker.GITHUB_REPO_URL}
-                """.trimIndent()
-            )
-            .setPositiveButton("前往 GitHub") { _, _ ->
+            .setTitle(getString(R.string.about_dialog_title, currentVersion))
+            .setMessage(getString(R.string.about_dialog_msg, UpdateChecker.GITHUB_REPO_URL))
+            .setPositiveButton(getString(R.string.btn_open_github)) { _, _ ->
                 openUrl(UpdateChecker.GITHUB_REPO_URL)
             }
-            .setNeutralButton("檢查更新") { _, _ ->
+            .setNeutralButton(getString(R.string.btn_check_update)) { _, _ ->
                 checkAppUpdate(manual = true)
             }
-            .setNegativeButton("關閉", null)
+            .setNegativeButton(getString(R.string.btn_close), null)
             .show()
     }
 
     private fun checkAppUpdate(manual: Boolean) {
         if (manual) {
-            Toast.makeText(this, "正在檢查 GitHub 最新版本…", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.toast_checking_update), Toast.LENGTH_SHORT).show()
         }
         UpdateChecker.checkForUpdate(this) { result ->
             if (isFinishing || isDestroyed) return@checkForUpdate
             result.onSuccess { info ->
                 if (info.hasUpdate) {
                     val targetUrl = info.apkDownloadUrl ?: info.releasePageUrl
+                    val notes = info.releaseNotes.ifBlank { getString(R.string.update_default_notes) }
                     MaterialAlertDialogBuilder(this)
-                        .setTitle("發現新版本 v${info.latestVersion}")
-                        .setMessage(
-                            "目前版本：v${info.currentVersion}\n最新版本：v${info.latestVersion}\n\n" +
-                                (info.releaseNotes.ifBlank { "已有新版 APK 可直接覆蓋安裝更新。" })
-                        )
-                        .setPositiveButton("立即下載更新 APK") { _, _ ->
+                        .setTitle(getString(R.string.update_found_title, info.latestVersion))
+                        .setMessage(getString(R.string.update_found_msg, info.currentVersion, info.latestVersion, notes))
+                        .setPositiveButton(getString(R.string.btn_download_apk)) { _, _ ->
                             openUrl(targetUrl)
                         }
-                        .setNeutralButton("查看發佈頁") { _, _ ->
+                        .setNeutralButton(getString(R.string.btn_view_release)) { _, _ ->
                             openUrl(info.releasePageUrl)
                         }
-                        .setNegativeButton("稍後再說", null)
+                        .setNegativeButton(getString(R.string.btn_later), null)
                         .show()
                 } else if (manual) {
-                    Toast.makeText(this, "目前已是最新版本 (v${info.currentVersion})", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        this,
+                        getString(R.string.toast_up_to_date, info.currentVersion),
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             }.onFailure { err ->
                 if (manual) {
-                    Toast.makeText(this, "檢查更新失敗：${err.message}", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        this,
+                        getString(R.string.toast_update_failed, err.message ?: ""),
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             }
         }
@@ -499,9 +494,10 @@ class MainActivity : AppCompatActivity() {
         runCatching {
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
         }.onFailure {
-            Toast.makeText(this, "無法開啟連結：$url", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.toast_cannot_open_url, url), Toast.LENGTH_SHORT).show()
         }
     }
+
     private fun buildLogCard(): MaterialCardView {
         val card = createCard()
         val inner = LinearLayout(this).apply {
@@ -515,7 +511,7 @@ class MainActivity : AppCompatActivity() {
             setPadding(0, 0, 0, dp(8))
         }
         val title = TextView(this).apply {
-            text = "近 24 小時處理紀錄"
+            text = getString(R.string.log_card_title)
             textSize = 16f
             setTypeface(null, Typeface.BOLD)
             setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface))
@@ -526,7 +522,7 @@ class MainActivity : AppCompatActivity() {
             null,
             com.google.android.material.R.attr.borderlessButtonStyle
         ).apply {
-            text = "清除"
+            text = getString(R.string.btn_clear)
             setOnClickListener {
                 GuardStateManager.clearLogs(this@MainActivity)
             }
@@ -560,7 +556,7 @@ class MainActivity : AppCompatActivity() {
         val shizukuReady = Shizuku.pingBinder() && Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
         applyBadgeStyle(
             shizukuBadge,
-            if (shizukuReady) "✅ Shizuku 權限：已授權" else "❌ Shizuku 權限：未授權",
+            getString(if (shizukuReady) R.string.badge_shizuku_ok else R.string.badge_shizuku_no),
             if (shizukuReady) R.color.status_safe_bg else R.color.status_error_bg,
             if (shizukuReady) R.color.status_safe_fg else R.color.status_error_fg
         )
@@ -568,7 +564,7 @@ class MainActivity : AppCompatActivity() {
         val blocked = ShizukuNetHelper.isBlocked
         applyBadgeStyle(
             networkBadge,
-            if (blocked) "⏳ Google 相簿網路：封鎖中（延遲上傳等待算圖）" else "🟢 Google 相簿網路：正常連線可上傳",
+            getString(if (blocked) R.string.badge_net_blocked else R.string.badge_net_normal),
             if (blocked) R.color.status_blocked_bg else R.color.status_safe_bg,
             if (blocked) R.color.status_blocked_fg else R.color.status_safe_fg
         )
@@ -576,18 +572,18 @@ class MainActivity : AppCompatActivity() {
         notifySwitch.isChecked = GuardStateManager.isNotificationEnabled(this)
 
         val delaySec = GuardStateManager.getRestoreDelaySec(this)
-        delayValueText.text = "目前設定：算圖完成且離開相機後，延遲 $delaySec 秒恢復上傳"
+        delayValueText.text = getString(R.string.delay_value_fmt, delaySec)
         if (delaySlider.value.toInt() != delaySec) {
             delaySlider.value = delaySec.toFloat()
         }
 
         val logs = GuardStateManager.getLogs(this)
-        logCountText.text = "自動保留最近 24 小時內的阻擋、算圖判讀與恢復紀錄（目前 ${logs.size} 筆，逾時自動移除）"
+        logCountText.text = getString(R.string.log_count_fmt, logs.size)
         logContainer.removeAllViews()
 
         if (logs.isEmpty()) {
             val emptyView = TextView(this).apply {
-                text = "尚無 24 小時內的處理紀錄。"
+                text = getString(R.string.log_empty)
                 textSize = 13f
                 setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface_muted))
                 setPadding(0, dp(8), 0, dp(8))
