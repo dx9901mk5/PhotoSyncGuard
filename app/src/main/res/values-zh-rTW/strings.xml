@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">PhotoSyncGuard</string>
+    <string name="toolbar_subtitle">相機算圖期間延遲 Google 相簿備份</string>
+
+    <string name="failsafe_title">緊急防呆恢復</string>
+    <string name="failsafe_desc">若發現 Google 相簿長時間無法上傳或卡住，點擊下方按鈕可立即強制解除封鎖並恢復連線。</string>
+    <string name="failsafe_btn">立即恢復 Google 相簿上傳與連線</string>
+    <string name="failsafe_toast_ok">已恢復 Google 相簿網路連線</string>
+    <string name="failsafe_toast_fail">恢復失敗，請檢查 Shizuku 權限</string>
+    <string name="failsafe_log_ok_title">防呆恢復已執行</string>
+    <string name="failsafe_log_fail_title">防呆恢復失敗</string>
+    <string name="failsafe_log_ok_detail">已清除算圖鎖定並恢復 Google 相簿網路連線</string>
+    <string name="failsafe_log_fail_detail">請確認 Shizuku 已啟動且授權</string>
+    <string name="failsafe_reason">使用者點擊緊急防呆按鈕，強制恢復 Google 相簿上傳與連線</string>
+
+    <string name="status_notify_title">運作狀態與通知設定</string>
+    <string name="badge_shizuku_ok">✅ Shizuku 權限：已授權</string>
+    <string name="badge_shizuku_no">❌ Shizuku 權限：未授權</string>
+    <string name="badge_net_blocked">⏳ Google 相簿網路：封鎖中（延遲上傳等待算圖）</string>
+    <string name="badge_net_normal">🟢 Google 相簿網路：正常連線可上傳</string>
+
+    <string name="notify_switch_title">延遲上傳與算圖完成通知</string>
+    <string name="notify_switch_sub">顯示是否正在延遲 Google 相簿上傳，以及算圖完畢恢復連線的通知</string>
+
+    <string name="delay_title">延遲恢復 Google 相簿上傳時間</string>
+    <string name="delay_value_fmt">目前設定：算圖完成且離開相機後，延遲 %1$d 秒恢復上傳</string>
+    <string name="delay_preset_default">%1$d秒(預設)</string>
+    <string name="delay_preset">%1$d秒</string>
+    <string name="delay_note">須離開相機且全部照片算圖完成（&gt;= 1MB、無暫存檔）後，再靜置達設定秒數（至少 30 秒）才恢復上傳；中途再開相機或拍照將重新判定。</string>
+
+    <string name="setup_title">權限引導與測試</string>
+    <string name="setup_hint">⚠️ 請於系統設定開啟本 App 的「自啟動」與「允許背景高耗電」，避免拍到一半被系統回收。</string>
+    <string name="btn_shizuku">1. 授權 Shizuku</string>
+    <string name="btn_storage">2. 授權相簿目錄監聽 (讀取圖片權限)</string>
+    <string name="btn_accessibility">3. 開啟無障礙服務 (偵測相機)</string>
+    <string name="btn_test_block">測試：手動切斷 Google 相簿網路</string>
+    <string name="toast_shizuku_granted">Shizuku 授權成功</string>
+    <string name="toast_shizuku_already">已取得 Shizuku 權限</string>
+    <string name="toast_shizuku_not_running">請先啟動 Shizuku 服務</string>
+    <string name="test_block_reason">使用者手動測試阻斷</string>
+
+    <string name="about_update_title">關於與版本更新</string>
+    <string name="about_version_fmt">目前版本：v%1$s（開啟 App 時會自動檢查 GitHub 是否有新版 APK）</string>
+    <string name="btn_about">關於我 / GitHub</string>
+    <string name="btn_check_update">檢查 APK 更新</string>
+    <string name="about_dialog_title">關於 PhotoSyncGuard v%1$s</string>
+    <string name="about_dialog_msg">專為 OPPO、vivo 與小米（全球版 / CN 版 ROM）設計的免 Root 守護工具（須搭配 Shizuku），防止 Google 相簿在相機算圖完成前搶先上傳低畫質半成品。\n\nPS：vivo 國際版 OriginOS 7（基於 Android 17）已內建修復，可忽略不使用本工具。\n\n專案 GitHub：\n%1$s</string>
+    <string name="btn_open_github">前往 GitHub</string>
+    <string name="btn_close">關閉</string>
+
+    <string name="toast_checking_update">正在檢查 GitHub 最新版本…</string>
+    <string name="update_found_title">發現新版本 v%1$s</string>
+    <string name="update_found_msg">目前版本：v%1$s\n最新版本：v%2$s\n\n%3$s</string>
+    <string name="update_default_notes">已有新版 APK 可直接覆蓋安裝更新。</string>
+    <string name="btn_download_apk">立即下載更新 APK</string>
+    <string name="btn_view_release">查看發佈頁</string>
+    <string name="btn_later">稍後再說</string>
+    <string name="toast_up_to_date">目前已是最新版本 (v%1$s)</string>
+    <string name="toast_update_failed">檢查更新失敗：%1$s</string>
+    <string name="toast_cannot_open_url">無法開啟連結：%1$s</string>
+
+    <string name="log_card_title">近 24 小時處理紀錄</string>
+    <string name="btn_clear">清除</string>
+    <string name="log_count_fmt">自動保留最近 24 小時內的阻擋、算圖判讀與恢復紀錄（目前 %1$d 筆，逾時自動移除）</string>
+    <string name="log_empty">尚無 24 小時內的處理紀錄。</string>
+
+    <string name="notif_channel_name">Google 相簿延遲上傳狀態通知</string>
+    <string name="notif_channel_desc">顯示目前是否正在延遲 Google 相簿網路上傳，以及算圖完成後恢復連線的通知</string>
+    <string name="notif_delay_title">⏳ 正在延遲 Google 相簿網路上傳</string>
+    <string name="notif_delay_big_fmt">%1$s\n待相機算圖完成（&gt;= 1MB）後將自動恢復網路上傳。</string>
+    <string name="notif_restored_title">✅ 相機算圖完畢，已恢復 Google 相簿上傳</string>
+</resources>
