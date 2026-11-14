@@ -31,6 +31,8 @@
 
     <string name="setup_title">权限引导与测试</string>
     <string name="setup_hint">⚠️ 请在系统设置开启本 App 的“自启动”与“允许后台高耗电”，避免拍到一半被系统回收。</string>
+    <string name="btn_grant_all_shizuku">⚡ 一键通过 Shizuku 授予所有 ADB 权限</string>
+    <string name="toast_grant_all_result">Shizuku 授权结果：图片 %1$s｜通知 %2$s｜无障碍 %3$s｜电池白名单 %4$s</string>
     <string name="btn_shizuku">1. 授权 Shizuku</string>
     <string name="btn_storage">2. 授权相册目录监听 (读取图片权限)</string>
     <string name="btn_accessibility">3. 开启无障碍服务 (检测相机)</string>
