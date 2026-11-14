@@ -31,6 +31,8 @@
 
     <string name="setup_title">Setup &amp; Diagnostics</string>
     <string name="setup_hint">⚠️ Please enable Auto-start and Allow Background High Power Usage in system settings so the OS does not kill this app.</string>
+    <string name="btn_grant_all_shizuku">⚡ One-Click Grant All Permissions via Shizuku</string>
+    <string name="toast_grant_all_result">Shizuku Grant: Media %1$s | Notify %2$s | Accessibility %3$s | Battery %4$s</string>
     <string name="btn_shizuku">1. Authorize Shizuku</string>
     <string name="btn_storage">2. Grant Media Read Permission</string>
     <string name="btn_accessibility">3. Enable Accessibility Service (Detect Camera)</string>
