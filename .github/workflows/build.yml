@@ -23,20 +23,20 @@ jobs:
       - name: Build Release APK
         run: gradle assembleRelease
       - name: Prepare APK
-        run: cp app/build/outputs/apk/release/app-release.apk PhotoSyncGuard-v1.0.2.apk
+        run: cp app/build/outputs/apk/release/app-release.apk PhotoSyncGuard-v1.0.3.apk
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: PhotoSyncGuard-APK
-          path: PhotoSyncGuard-v1.0.2.apk
-      - name: Publish GitHub Release v1.0.2
+          path: PhotoSyncGuard-v1.0.3.apk
+      - name: Publish GitHub Release v1.0.3
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if gh release view v1.0.2 >/dev/null 2>&1; then
-            gh release upload v1.0.2 PhotoSyncGuard-v1.0.2.apk --clobber
+          if gh release view v1.0.3 >/dev/null 2>&1; then
+            gh release upload v1.0.3 PhotoSyncGuard-v1.0.3.apk --clobber
           else
-            gh release create v1.0.2 PhotoSyncGuard-v1.0.2.apk \
-              --title "PhotoSyncGuard v1.0.2" \
-              --notes "新增使用者自訂「延遲恢復 Google 相簿上傳時間」（0~30 秒滑桿與 3/5/10/15 秒快速預設，原預設為 5 秒）。使用同一把固定簽名金鑰，可直接覆蓋 v1.0.1 安裝。"
+            gh release create v1.0.3 PhotoSyncGuard-v1.0.3.apk \
+              --title "PhotoSyncGuard v1.0.3" \
+              --notes "新增「關於我 / GitHub 專案連結」按鈕與「自動檢查 GitHub 最新 APK 更新」提示功能。使用同一把固定簽名金鑰，可直接覆蓋舊版安裝。"
           fi
