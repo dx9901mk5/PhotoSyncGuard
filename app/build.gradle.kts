@@ -1,7 +1,15 @@
+import java.security.KeyStore
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
+
+val fixedKeystoreFile = file("signing/photosyncguard.p12")
+val fixedKeystorePassword = "PhotoSyncGuard2026!"
+val fixedKeyAlias: String = KeyStore.getInstance("PKCS12").apply {
+    fixedKeystoreFile.inputStream().use { load(it, fixedKeystorePassword.toCharArray()) }
+}.aliases().nextElement()
 
 android {
     namespace = "com.guard.photosync"
@@ -17,10 +25,10 @@ android {
 
     signingConfigs {
         create("fixed") {
-            storeFile = file("signing/photosyncguard.p12")
-            storePassword = "PhotoSyncGuard2026!"
-            keyAlias = "photosyncguard"
-            keyPassword = "PhotoSyncGuard2026!"
+            storeFile = fixedKeystoreFile
+            storePassword = fixedKeystorePassword
+            keyAlias = fixedKeyAlias
+            keyPassword = fixedKeystorePassword
             storeType = "PKCS12"
         }
     }
