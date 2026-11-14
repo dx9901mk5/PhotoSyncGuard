@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -21,6 +22,7 @@ import androidx.core.widget.NestedScrollView
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.android.material.slider.Slider
 import rikka.shizuku.Shizuku
@@ -92,12 +94,18 @@ class MainActivity : AppCompatActivity() {
         // 3. 權限設定與手動測試卡片
         content.addView(buildSetupCard())
 
-        // 4. 下方：24 小時處理過程與阻擋/恢復紀錄
+        // 4. 關於我、GitHub 專案與 APK 自動檢查更新卡片
+        content.addView(buildAboutAndUpdateCard())
+
+        // 5. 最下方：24 小時處理過程與阻擋/恢復紀錄
         content.addView(buildLogCard())
 
         scrollView.addView(content)
         root.addView(scrollView)
         setContentView(root)
+
+        // 啟動時自動檢查 GitHub 是否有新版本 APK
+        checkAppUpdate(manual = false)
     }
 
     private fun buildFailsafeCard(): MaterialCardView {
@@ -300,7 +308,6 @@ class MainActivity : AppCompatActivity() {
         card.addView(inner)
         return card
     }
-
     private fun buildSetupCard(): MaterialCardView {
         val card = createCard()
         val inner = LinearLayout(this).apply {
@@ -373,6 +380,127 @@ class MainActivity : AppCompatActivity() {
         inner.addView(btnTestBlock)
         card.addView(inner)
         return card
+    }
+
+    private fun buildAboutAndUpdateCard(): MaterialCardView {
+        val card = createCard()
+        val inner = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+        }
+
+        val currentVersion = UpdateChecker.getCurrentVersionName(this)
+        val header = TextView(this).apply {
+            text = "關於與版本更新"
+            textSize = 16f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface))
+        }
+        val versionDesc = TextView(this).apply {
+            text = "目前版本：v$currentVersion（開啟 App 時會自動檢查 GitHub 是否有新版 APK）"
+            textSize = 12f
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface_muted))
+            setPadding(0, dp(4), 0, dp(12))
+        }
+
+        val btnRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+        val btnAbout = MaterialButton(this).apply {
+            text = "關於我 / GitHub"
+            cornerRadius = dp(10)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginEnd = dp(6)
+            }
+            setOnClickListener { showAboutDialog() }
+        }
+        val btnCheckUpdate = MaterialButton(
+            this,
+            null,
+            com.google.android.material.R.attr.materialButtonOutlinedStyle
+        ).apply {
+            text = "檢查 APK 更新"
+            cornerRadius = dp(10)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginStart = dp(6)
+            }
+            setOnClickListener { checkAppUpdate(manual = true) }
+        }
+
+        btnRow.addView(btnAbout)
+        btnRow.addView(btnCheckUpdate)
+
+        inner.addView(header)
+        inner.addView(versionDesc)
+        inner.addView(btnRow)
+        card.addView(inner)
+        return card
+    }
+
+    private fun showAboutDialog() {
+        val currentVersion = UpdateChecker.getCurrentVersionName(this)
+        MaterialAlertDialogBuilder(this)
+            .setTitle("關於 PhotoSyncGuard v$currentVersion")
+            .setMessage(
+                """
+                專為 OPPO、vivo 與小米（全球版 / CN 版 ROM）設計的免 Root 守護工具，防止 Google 相簿在相機算圖完成前搶先上傳低畫質半成品。
+                
+                PS：vivo 國際版 OriginOS 7（基於 Android 17）已內建修復，可忽略不使用本工具。
+                
+                專案 GitHub：
+                ${UpdateChecker.GITHUB_REPO_URL}
+                """.trimIndent()
+            )
+            .setPositiveButton("前往 GitHub") { _, _ ->
+                openUrl(UpdateChecker.GITHUB_REPO_URL)
+            }
+            .setNeutralButton("檢查更新") { _, _ ->
+                checkAppUpdate(manual = true)
+            }
+            .setNegativeButton("關閉", null)
+            .show()
+    }
+
+    private fun checkAppUpdate(manual: Boolean) {
+        if (manual) {
+            Toast.makeText(this, "正在檢查 GitHub 最新版本…", Toast.LENGTH_SHORT).show()
+        }
+        UpdateChecker.checkForUpdate(this) { result ->
+            if (isFinishing || isDestroyed) return@checkForUpdate
+            result.onSuccess { info ->
+                if (info.hasUpdate) {
+                    val targetUrl = info.apkDownloadUrl ?: info.releasePageUrl
+                    MaterialAlertDialogBuilder(this)
+                        .setTitle("發現新版本 v${info.latestVersion}")
+                        .setMessage(
+                            "目前版本：v${info.currentVersion}\n最新版本：v${info.latestVersion}\n\n" +
+                                (info.releaseNotes.ifBlank { "已有新版 APK 可直接覆蓋安裝更新。" })
+                        )
+                        .setPositiveButton("立即下載更新 APK") { _, _ ->
+                            openUrl(targetUrl)
+                        }
+                        .setNeutralButton("查看發佈頁") { _, _ ->
+                            openUrl(info.releasePageUrl)
+                        }
+                        .setNegativeButton("稍後再說", null)
+                        .show()
+                } else if (manual) {
+                    Toast.makeText(this, "目前已是最新版本 (v${info.currentVersion})", Toast.LENGTH_SHORT).show()
+                }
+            }.onFailure { err ->
+                if (manual) {
+                    Toast.makeText(this, "檢查更新失敗：${err.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    private fun openUrl(url: String) {
+        runCatching {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        }.onFailure {
+            Toast.makeText(this, "無法開啟連結：$url", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun buildLogCard(): MaterialCardView {
