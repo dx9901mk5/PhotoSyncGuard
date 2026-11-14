@@ -30,8 +30,6 @@ class CameraGuardService : AccessibilityService() {
         )
         // 1MB 門檻 (1024 * 1024 bytes)
         private const val MIN_FINISHED_FILE_SIZE_BYTES = 1048576L
-        // 算圖完成（檔案 >= 1MB）且離開相機後的緩衝時間（5秒）
-        private const val NORMAL_DEBOUNCE_MS = 5000L
         // 安全兜底時間：若檔案一直 < 1MB，離開相機且無寫入達 35 秒後強制恢復網路（避免極端小圖導致永久斷網）
         private const val SAFETY_TIMEOUT_MS = 35000L
     }
@@ -54,10 +52,11 @@ class CameraGuardService : AccessibilityService() {
 
     private val restoreNetworkRunnable = Runnable {
         if (!isCameraInForeground && ShizukuNetHelper.isBlocked) {
+            val delaySec = GuardStateManager.getRestoreDelaySec(this)
             val reason = if (hasUnfinishedSmallPhoto) {
                 "已達安全閒置時限（35秒無寫入），強制恢復 Google 相簿網路"
             } else {
-                "相機算圖完成並已離開相機，恢復 Google 相簿網路"
+                "相機算圖完成並已離開相機（延遲 ${delaySec} 秒緩衝），恢復 Google 相簿網路"
             }
             Log.i(TAG, reason)
             hasUnfinishedSmallPhoto = false
@@ -176,7 +175,11 @@ class CameraGuardService : AccessibilityService() {
     private fun scheduleRestoreCheck() {
         handler.removeCallbacks(restoreNetworkRunnable)
         if (isCameraInForeground) return
-        val delay = if (hasUnfinishedSmallPhoto) SAFETY_TIMEOUT_MS else NORMAL_DEBOUNCE_MS
+        val delay = if (hasUnfinishedSmallPhoto) {
+            SAFETY_TIMEOUT_MS
+        } else {
+            GuardStateManager.getRestoreDelaySec(this) * 1000L
+        }
         handler.postDelayed(restoreNetworkRunnable, delay)
     }
 
