@@ -180,9 +180,9 @@ object GuardStateManager {
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_notify_sync)
-            .setContentTitle("⏳ 正在延遲 Google 相簿網路上傳")
+            .setContentTitle(context.getString(R.string.notif_delay_title))
             .setContentText(reason)
-            .setStyle(NotificationCompat.BigTextStyle().bigText("$reason\n待相機算圖完成（>= 1MB）後將自動恢復網路上傳。"))
+            .setStyle(NotificationCompat.BigTextStyle().bigText(context.getString(R.string.notif_delay_big_fmt, reason)))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setContentIntent(openIntent)
@@ -205,7 +205,7 @@ object GuardStateManager {
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_sys_upload_done)
-            .setContentTitle("✅ 相機算圖完畢，已恢復 Google 相簿上傳")
+            .setContentTitle(context.getString(R.string.notif_restored_title))
             .setContentText(reason)
             .setStyle(NotificationCompat.BigTextStyle().bigText(reason))
             .setOngoing(false)
@@ -238,10 +238,10 @@ object GuardStateManager {
         if (nm.getNotificationChannel(CHANNEL_ID) == null) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Google 相簿延遲上傳狀態通知",
+                context.getString(R.string.notif_channel_name),
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "顯示目前是否正在延遲 Google 相簿網路上傳，以及算圖完成後恢復連線的通知"
+                description = context.getString(R.string.notif_channel_desc)
             }
             nm.createNotificationChannel(channel)
         }
