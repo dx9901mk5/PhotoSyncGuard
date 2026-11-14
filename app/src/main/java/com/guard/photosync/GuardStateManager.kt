@@ -22,6 +22,8 @@ import java.util.concurrent.CopyOnWriteArrayList
 object GuardStateManager {
     private const val PREFS_NAME = "photosync_guard_prefs"
     private const val KEY_NOTIFY_ENABLED = "notify_enabled"
+    private const val KEY_RESTORE_DELAY_SEC = "restore_delay_sec"
+    private const val DEFAULT_RESTORE_DELAY_SEC = 5
     private const val KEY_LOGS = "process_logs_24h"
     private const val RETENTION_MS = 24L * 60L * 60L * 1000L
 
@@ -81,6 +83,18 @@ object GuardStateManager {
         if (!enabled) {
             cancelNotifications(context)
         }
+        notifyListeners()
+    }
+
+    fun getRestoreDelaySec(context: Context): Int {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getInt(KEY_RESTORE_DELAY_SEC, DEFAULT_RESTORE_DELAY_SEC).coerceIn(0, 60)
+    }
+
+    fun setRestoreDelaySec(context: Context, seconds: Int) {
+        val clamped = seconds.coerceIn(0, 60)
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putInt(KEY_RESTORE_DELAY_SEC, clamped).apply()
         notifyListeners()
     }
 
