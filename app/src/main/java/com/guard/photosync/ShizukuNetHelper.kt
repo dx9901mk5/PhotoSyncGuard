@@ -166,11 +166,15 @@ object ShizukuNetHelper {
             accessibilityGranted = a11yOk,
             batteryWhitelistGranted = batteryOk
         )
+        val mediaSymbol = if (mediaOk) "✅" else "❌"
+        val notifSymbol = if (notifOk) "✅" else "❌"
+        val a11ySymbol = if (a11yOk) "✅" else "⚠️需手動"
+        val batterySymbol = if (batteryOk) "✅" else "⚠️"
         GuardStateManager.addLog(
             context,
             GuardStateManager.LogCategory.INFO,
             "Shizuku 一鍵授權執行完成",
-            "媒體讀取=${if (mediaOk) \"✅\" else \"❌\"}, 通知=${if (notifOk) \"✅\" else \"❌\"}, 無障礙=${if (a11yOk) \"✅\" else \"⚠️需手動\"}, 電池白名單=${if (batteryOk) \"✅\" else \"⚠️\"}"
+            "媒體讀取=$mediaSymbol, 通知=$notifSymbol, 無障礙=$a11ySymbol, 電池白名單=$batterySymbol"
         )
         return report
     }
@@ -195,7 +199,8 @@ object ShizukuNetHelper {
             val exitCode = process.waitFor()
             if (exitCode != 0) {
                 Log.e(TAG, "指令執行異常 ($exitCode): $err")
-                Triple(false, out, "exit=$exitCode ${err.ifEmpty { \"無錯誤訊息\" }}")
+                val errMsgText = err.ifEmpty { "無錯誤訊息" }
+                Triple(false, out, "exit=$exitCode $errMsgText")
             } else {
                 Triple(true, out, "")
             }
