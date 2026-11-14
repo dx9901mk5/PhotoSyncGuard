@@ -2,6 +2,8 @@ package com.guard.photosync
 
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Build
+import android.provider.Settings
 import android.util.Log
 import rikka.shizuku.Shizuku
 import java.io.BufferedReader
@@ -10,6 +12,13 @@ import java.io.InputStreamReader
 object ShizukuNetHelper {
     private const val TAG = "ShizukuNetHelper"
     const val PHOTOS_PACKAGE = "com.google.android.apps.photos"
+
+    data class GrantReport(
+        val mediaGranted: Boolean,
+        val notificationGranted: Boolean,
+        val accessibilityGranted: Boolean,
+        val batteryWhitelistGranted: Boolean
+    )
 
     @Volatile
     var isBlocked: Boolean = false
@@ -91,7 +100,87 @@ object ShizukuNetHelper {
         return success
     }
 
+    fun isAccessibilityEnabled(context: Context): Boolean {
+        val pkg = context.packageName
+        val fullComponent = "$pkg/${CameraGuardService::class.java.name}"
+        val shortComponent = "$pkg/.${CameraGuardService::class.java.simpleName}"
+        val enabled = Settings.Secure.getString(
+            context.contentResolver,
+            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+        ) ?: return false
+        return enabled.split(':').any {
+            it.equals(fullComponent, ignoreCase = true) || it.equals(shortComponent, ignoreCase = true)
+        }
+    }
+
+    fun grantAllPermissionsViaShizuku(context: Context): GrantReport? {
+        if (!Shizuku.pingBinder() || Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) {
+            return null
+        }
+
+        val pkg = context.packageName
+
+        // 1. 媒體讀取權限
+        val mediaPerm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            "android.permission.READ_MEDIA_IMAGES"
+        } else {
+            "android.permission.READ_EXTERNAL_STORAGE"
+        }
+        val (mediaOk, _) = executeShizukuShell("pm grant $pkg $mediaPerm")
+
+        // 2. 通知權限 (Android 13+)
+        val notifOk = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            executeShizukuShell("pm grant $pkg android.permission.POST_NOTIFICATIONS").first
+        } else {
+            true
+        }
+
+        // 3. 解除側載受限設定並啟用無障礙服務（保留既有其他服務）
+        executeShizukuShell("appops set $pkg ACCESS_RESTRICTED_SETTINGS allow")
+        val component = "$pkg/${CameraGuardService::class.java.name}"
+        val (readOk, currentServices, _) = executeShizukuShellWithOutput(
+            "settings get secure enabled_accessibility_services"
+        )
+        val a11yOk = if (readOk) {
+            val cleaned = currentServices.trim().let { if (it == "null") "" else it }
+            val parts = cleaned.split(':').filter { it.isNotBlank() }.toMutableList()
+            if (parts.none { it.equals(component, ignoreCase = true) || it.equals("$pkg/.${CameraGuardService::class.java.simpleName}", ignoreCase = true) }) {
+                parts.add(component)
+            }
+            val joined = parts.joinToString(":")
+            val putOk = executeShizukuShell("settings put secure enabled_accessibility_services \"$joined\"").first
+            val enableOk = executeShizukuShell("settings put secure accessibility_enabled 1").first
+            (putOk && enableOk) || isAccessibilityEnabled(context)
+        } else {
+            isAccessibilityEnabled(context)
+        }
+
+        // 4. 電池優化白名單與背景執行許可
+        val batteryOk = executeShizukuShell("dumpsys deviceidle whitelist +$pkg").first
+        executeShizukuShell("cmd appops set $pkg RUN_IN_BACKGROUND allow")
+        executeShizukuShell("cmd appops set $pkg RUN_ANY_IN_BACKGROUND allow")
+
+        val report = GrantReport(
+            mediaGranted = mediaOk,
+            notificationGranted = notifOk,
+            accessibilityGranted = a11yOk,
+            batteryWhitelistGranted = batteryOk
+        )
+        GuardStateManager.addLog(
+            context,
+            GuardStateManager.LogCategory.INFO,
+            "Shizuku 一鍵授權執行完成",
+            "媒體讀取=${if (mediaOk) \"✅\" else \"❌\"}, 通知=${if (notifOk) \"✅\" else \"❌\"}, 無障礙=${if (a11yOk) \"✅\" else \"⚠️需手動\"}, 電池白名單=${if (batteryOk) \"✅\" else \"⚠️\"}"
+        )
+        return report
+    }
+
     private fun executeShizukuShell(command: String): Pair<Boolean, String> {
+        val (ok, _, err) = executeShizukuShellWithOutput(command)
+        return Pair(ok, err)
+    }
+
+    private fun executeShizukuShellWithOutput(command: String): Triple<Boolean, String, String> {
         return try {
             val method = Shizuku::class.java.getDeclaredMethod(
                 "newProcess",
@@ -101,17 +190,18 @@ object ShizukuNetHelper {
             )
             method.isAccessible = true
             val process = method.invoke(null, arrayOf("sh", "-c", command), null, null) as Process
+            val out = BufferedReader(InputStreamReader(process.inputStream)).readText().trim()
+            val err = BufferedReader(InputStreamReader(process.errorStream)).readText().trim()
             val exitCode = process.waitFor()
             if (exitCode != 0) {
-                val err = BufferedReader(InputStreamReader(process.errorStream)).readText().trim()
                 Log.e(TAG, "指令執行異常 ($exitCode): $err")
-                Pair(false, "exit=$exitCode ${err.ifEmpty { "無錯誤訊息" }}")
+                Triple(false, out, "exit=$exitCode ${err.ifEmpty { \"無錯誤訊息\" }}")
             } else {
-                Pair(true, "")
+                Triple(true, out, "")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Shizuku 執行失敗", e)
-            Pair(false, e.message ?: "未知例外")
+            Triple(false, "", e.message ?: "未知例外")
         }
     }
 }
