@@ -13,6 +13,7 @@ import android.os.Looper
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 
 class CameraGuardService : AccessibilityService() {
     companion object {
@@ -31,87 +32,117 @@ class CameraGuardService : AccessibilityService() {
             "com.xiaomi.camera",
             "com.huawei.camera"
         )
+
         // 1MB 門檻 (1024 * 1024 bytes)
         private const val MIN_FINISHED_FILE_SIZE_BYTES = 1048576L
-        // 極端小圖安全兜底時間：即使拖到幾分鐘也無妨，連續 5 分鐘完全無寫入才強制恢復避免永久死鎖
-        private const val SAFETY_TIMEOUT_MS = 300_000L
+        // 強制最低等待驗證門檻：不論如何至少滿 30 秒才開始驗證算圖結果
+        private const val MIN_WAIT_BEFORE_VERIFY_MS = 30_000L
+        // 驗證未通過時的再次檢查間隔（30秒）
+        private const val REVERIFY_INTERVAL_MS = 30_000L
+        // 極端情況安全兜底上限（10分鐘無任何寫入才強制釋放避免永久死鎖）
+        private const val SAFETY_MAX_IDLE_MS = 600_000L
     }
 
     private val handler = Handler(Looper.getMainLooper())
     private var isCameraInForeground = false
-    private var hasUnfinishedSmallPhoto = false
     @Volatile
     private var sessionStartTimeMs = 0L
     @Volatile
     private var lastCameraExitTimeMs = 0L
     @Volatile
     private var lastFileEventTimeMs = 0L
+
+    private val sessionPhotoNames = ConcurrentHashMap.newKeySet<String>()
+    private val loggedShotFiles = ConcurrentHashMap<String, Long>()
     private var fileObserver: FileObserver? = null
 
     private val forceRestoreReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == ACTION_FORCE_RESTORE) {
-                handler.removeCallbacks(restoreNetworkRunnable)
-                hasUnfinishedSmallPhoto = false
+                handler.removeCallbacks(verifyAndRestoreRunnable)
                 isCameraInForeground = false
-                sessionStartTimeMs = 0L
-                Log.i(TAG, "收到手動防呆恢復指令，已清除計時器與工作階段鎖定")
+                resetSession()
+                Log.i(TAG, "收到手動防呆恢復指令，已清除計時器與拍攝工作階段")
             }
         }
     }
 
-    private val restoreNetworkRunnable: Runnable = object : Runnable {
+    private val verifyAndRestoreRunnable: Runnable = object : Runnable {
         override fun run() {
             if (isCameraInForeground || !ShizukuNetHelper.isBlocked) return
 
             val now = System.currentTimeMillis()
-            val unfinishedFile = findUnfinishedFileInCameraDir()
-            val idleSinceLastEvent = now - lastFileEventTimeMs
-
-            if (unfinishedFile != null && idleSinceLastEvent < SAFETY_TIMEOUT_MS) {
-                Log.i(TAG, "偵測到拍攝工作階段仍有未完成檔案 ($unfinishedFile)，繼續延遲恢復網路")
-                GuardStateManager.addLog(
-                    this@CameraGuardService,
-                    GuardStateManager.LogCategory.PHOTO_WAIT,
-                    "仍有暫存或未算完檔案，繼續阻斷",
-                    "$unfinishedFile 尚未消失或達 1MB，延後恢復網路"
-                )
-                GuardStateManager.notifyDelaying(this@CameraGuardService, "等待 $unfinishedFile 算圖完成…")
-                handler.postDelayed(this, 5000L)
-                return
-            }
-
             val delaySec = GuardStateManager.getRestoreDelaySec(this@CameraGuardService)
-            val requiredDelayMs = delaySec * 1000L
+            val requiredWaitMs = maxOf(delaySec * 1000L, MIN_WAIT_BEFORE_VERIFY_MS)
             val lastActivityMs = maxOf(lastCameraExitTimeMs, lastFileEventTimeMs)
             val quietElapsedMs = now - lastActivityMs
 
-            if (unfinishedFile == null && quietElapsedMs < requiredDelayMs) {
-                val remainingMs = (requiredDelayMs - quietElapsedMs).coerceAtLeast(1000L)
-                Log.i(TAG, "全部照片已算圖完成，尚需靜置緩衝 ${remainingMs / 1000} 秒後才恢復網路")
+            // 第一關：只要拍照或剛離開相機，必須先完整靜置滿設定秒數（至少 30 秒起跳）才開始驗證
+            if (quietElapsedMs < requiredWaitMs) {
+                val remainingMs = (requiredWaitMs - quietElapsedMs).coerceAtLeast(1000L)
+                Log.i(TAG, "距離最後拍照/離開相機尚未滿 ${delaySec} 秒，繼續等待 ${remainingMs / 1000} 秒後再驗證")
                 GuardStateManager.notifyDelaying(
                     this@CameraGuardService,
-                    "已算圖完成，緩衝倒數 ${remainingMs / 1000} 秒（期間若再開相機將重新判定）"
+                    "已鎖定斷網，等待滿 ${delaySec} 秒後開始驗證照片（剩餘 ${remainingMs / 1000} 秒）"
                 )
                 handler.postDelayed(this, remainingMs)
                 return
             }
 
-            val reason = if (unfinishedFile != null) {
-                "已達安全閒置上限（5分鐘無寫入），強制恢復 Google 相簿網路"
+            // 第二關：已靜置滿 30 秒以上，開始全面驗證本次拍攝工作階段的所有檔案
+            val verification = verifyAllSessionPhotosFinished(now)
+            val idleSinceLastFileMs = now - lastFileEventTimeMs
+
+            if (!verification.allFinished && idleSinceLastFileMs < SAFETY_MAX_IDLE_MS) {
+                val detail = "等待滿 ${delaySec} 秒後驗證未通過：${verification.unfinishedReason}，繼續保持斷網並於 30 秒後重新驗證"
+                Log.i(TAG, detail)
+                GuardStateManager.addLog(
+                    this@CameraGuardService,
+                    GuardStateManager.LogCategory.PHOTO_WAIT,
+                    "驗證尚未全數完成，繼續延長阻斷",
+                    detail
+                )
+                GuardStateManager.notifyDelaying(
+                    this@CameraGuardService,
+                    "驗證發現未算完檔案 (${verification.unfinishedReason})，繼續阻斷 Google 相簿網路…"
+                )
+                handler.postDelayed(this, REVERIFY_INTERVAL_MS)
+                return
+            }
+
+            // 第三關：全部照片驗證完畢（或已達 10 分鐘極端兜底上限），正式開放 Google 相簿網路
+            val reason = if (!verification.allFinished) {
+                "已達極端安全上限（10分鐘無寫入），強制恢復 Google 相簿網路"
             } else {
-                "全部照片算圖完成且已靜置滿 ${delaySec} 秒（期間無再開相機），恢復 Google 相簿網路"
+                "已等待滿 ${delaySec} 秒並驗證全部照片算圖完成（共 ${verification.verifiedPhotoCount} 張成片、無暫存檔），開放 Google 相簿網路上傳"
             }
             Log.i(TAG, reason)
-            hasUnfinishedSmallPhoto = false
-            sessionStartTimeMs = 0L
+            GuardStateManager.addLog(
+                this@CameraGuardService,
+                GuardStateManager.LogCategory.PHOTO_READY,
+                "全部照片驗證通過",
+                "共驗證 ${verification.verifiedPhotoCount} 張照片 (>= 1MB 且無暫存檔)"
+            )
+            resetSession()
             ShizukuNetHelper.setPhotosNetworkBlocked(this@CameraGuardService, false, reason)
         }
     }
 
+    private data class VerificationResult(
+        val allFinished: Boolean,
+        val verifiedPhotoCount: Int,
+        val unfinishedReason: String = ""
+    )
+
+    private fun resetSession() {
+        sessionStartTimeMs = 0L
+        sessionPhotoNames.clear()
+        loggedShotFiles.clear()
+    }
+
     override fun onServiceConnected() {
         super.onServiceConnected()
-        Log.i(TAG, "無障礙服務已啟動，開始監控相機與檔案大小門檻")
+        Log.i(TAG, "無障礙服務已啟動，開始監控相機與拍照工作階段（至少 30 秒後才驗證）")
         val filter = IntentFilter(ACTION_FORCE_RESTORE)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(forceRestoreReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
@@ -123,7 +154,7 @@ class CameraGuardService : AccessibilityService() {
             this,
             GuardStateManager.LogCategory.INFO,
             "守護服務已啟動",
-            "開始監控前景相機與 /DCIM/Camera/ 檔案大小（門檻 1MB）"
+            "只要拍照即鎖定斷網，至少等待 30 秒以上才開始驗證全部照片是否算圖完畢"
         )
         startDcimObserver()
     }
@@ -133,30 +164,31 @@ class CameraGuardService : AccessibilityService() {
             val pkgName = event.packageName?.toString() ?: return
             if (pkgName == "com.android.systemui" || pkgName == packageName) return
             if (CAMERA_PACKAGES.contains(pkgName)) {
+                val now = System.currentTimeMillis()
                 isCameraInForeground = true
                 if (sessionStartTimeMs == 0L) {
-                    sessionStartTimeMs = System.currentTimeMillis()
+                    sessionStartTimeMs = now
                 }
-                handler.removeCallbacks(restoreNetworkRunnable)
+                handler.removeCallbacks(verifyAndRestoreRunnable)
                 if (!ShizukuNetHelper.isBlocked) {
                     Log.i(TAG, "偵測到相機開啟 ($pkgName)，立即切斷 Google 相簿網路")
                     ShizukuNetHelper.setPhotosNetworkBlocked(this, true, "偵測到相機開啟 ($pkgName)")
                 } else {
-                    GuardStateManager.notifyDelaying(this, "偵測到再次開啟相機，重新判定算圖與緩衝")
+                    GuardStateManager.notifyDelaying(this, "偵測到使用相機中，持續阻斷 Google 相簿網路並重置驗證計時")
                 }
             } else {
                 if (isCameraInForeground) {
                     isCameraInForeground = false
                     lastCameraExitTimeMs = System.currentTimeMillis()
-                    Log.i(TAG, "已離開相機，進入至少 30 秒以上緩衝與全數算圖確認")
-                    scheduleRestoreCheck()
+                    val delaySec = GuardStateManager.getRestoreDelaySec(this)
+                    Log.i(TAG, "已離開相機，將先等待至少 ${delaySec} 秒後再開始驗證全部照片")
+                    scheduleVerifyAfterWait()
                 }
             }
         }
     }
 
     private fun startDcimObserver() {
-        // 僅監控相機專屬目錄，天然排除 Screenshots 截圖目錄
         val cameraDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM), "Camera")
         if (!cameraDir.exists()) return
         @Suppress("DEPRECATION")
@@ -171,84 +203,79 @@ class CameraGuardService : AccessibilityService() {
                 if (sessionStartTimeMs == 0L) {
                     sessionStartTimeMs = now
                 }
+
                 val lowerPath = path.lowercase()
-                // 偵測系統正在寫入的隱藏暫存檔（通常以 . 開頭、包含 pending 或 .tmp）
-                if (path.startsWith(".") || lowerPath.contains("pending") || lowerPath.endsWith(".tmp")) {
-                    if ((event and (DELETE or MOVED_FROM)) != 0) {
-                        // 暫存檔被刪除或更名（代表可能剛完成轉存），重新排程檢查
-                        scheduleRestoreCheck()
-                    } else {
-                        hasUnfinishedSmallPhoto = true
-                        ensureNetworkBlocked("偵測到相機暫存檔寫入: $path")
+                val isTempFile = path.startsWith(".") || lowerPath.contains("pending") || lowerPath.endsWith(".tmp")
+                val isPhotoFile = lowerPath.endsWith(".jpg") || lowerPath.endsWith(".jpeg") ||
+                    lowerPath.endsWith(".heic") || lowerPath.endsWith(".dng")
+
+                if (!isTempFile && !isPhotoFile) return
+
+                // 不論檔案大小為何、不論是否為暫存檔，只要偵測到拍照或照片異動，一律立即切斷網路並重新起算 30 秒以上等待期！
+                if ((event and (CREATE or MODIFY or CLOSE_WRITE or MOVED_TO)) != 0) {
+                    if (isPhotoFile && !isTempFile) {
+                        sessionPhotoNames.add(path)
                     }
-                    return
-                }
-                // 僅針對照片格式進行大小檢查（排除 mp4 錄影檔以免長影片誤判）
-                if (lowerPath.endsWith(".jpg") || lowerPath.endsWith(".jpeg") || lowerPath.endsWith(".heic")) {
-                    val file = File(cameraDir, path)
-                    if (file.exists()) {
-                        val fileSize = file.length()
-                        val sizeKb = fileSize / 1024
-                        if (fileSize in 1 until MIN_FINISHED_FILE_SIZE_BYTES) {
-                            // 檔案小於 1MB：認定為尚未算完的低畫質預覽圖
-                            if (!hasUnfinishedSmallPhoto) {
-                                GuardStateManager.addLog(
-                                    this@CameraGuardService,
-                                    GuardStateManager.LogCategory.PHOTO_WAIT,
-                                    "偵測到未算完小圖 (< 1MB)",
-                                    "$path (${sizeKb} KB)，強制保持斷網等待算圖"
-                                )
-                            }
-                            hasUnfinishedSmallPhoto = true
-                            ensureNetworkBlocked("偵測到小於 1MB 的未算完照片 ($path, ${sizeKb} KB)")
-                        } else if (fileSize >= MIN_FINISHED_FILE_SIZE_BYTES) {
-                            // 檔案 >= 1MB：認定為算圖完成並已覆寫為完整成片
-                            if (hasUnfinishedSmallPhoto) {
-                                Log.i(TAG, "照片已算圖完成並覆寫 ($path, ${sizeKb} KB)，解除小圖鎖定")
-                                GuardStateManager.addLog(
-                                    this@CameraGuardService,
-                                    GuardStateManager.LogCategory.PHOTO_READY,
-                                    "判讀照片算圖完成 (>= 1MB)",
-                                    "$path (${sizeKb} KB)，準備恢復 Google 相簿網路"
-                                )
-                            }
-                            hasUnfinishedSmallPhoto = false
-                            if (ShizukuNetHelper.isBlocked || isCameraInForeground) {
-                                scheduleRestoreCheck()
-                            }
-                        }
+                    val delaySec = GuardStateManager.getRestoreDelaySec(this@CameraGuardService)
+                    val lastLogged = loggedShotFiles[path] ?: 0L
+                    if (now - lastLogged > 8000L) {
+                        loggedShotFiles[path] = now
+                        val file = File(cameraDir, path)
+                        val sizeInfo = if (file.exists()) "${file.length() / 1024} KB" else "寫入中"
+                        GuardStateManager.addLog(
+                            this@CameraGuardService,
+                            GuardStateManager.LogCategory.PHOTO_WAIT,
+                            "偵測到拍照寫入，重新起算 ${delaySec} 秒等待期",
+                            "$path ($sizeInfo) — 期間嚴格禁止 Google 相簿聯網，滿 ${delaySec} 秒後才進行驗證"
+                        )
                     }
+                    ensureNetworkBlocked("偵測到拍照寫入 ($path)，鎖定斷網並等待至少 ${delaySec} 秒後驗證")
+                } else {
+                    // DELETE 或 MOVED_FROM（例如暫存檔被清除），同樣重新起算等待期確保穩定
+                    scheduleVerifyAfterWait()
                 }
             }
         }
         fileObserver?.startWatching()
     }
 
-    private fun findUnfinishedFileInCameraDir(): String? {
+    private fun verifyAllSessionPhotosFinished(now: Long): VerificationResult {
         val cameraDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM), "Camera")
-        val files = cameraDir.listFiles() ?: return null
-        val now = System.currentTimeMillis()
-        val sessionCutoff = if (sessionStartTimeMs > 0L) sessionStartTimeMs - 2000L else now - 180_000L
+        val files = cameraDir.listFiles() ?: return VerificationResult(true, 0)
+        val sessionCutoff = if (sessionStartTimeMs > 0L) sessionStartTimeMs - 2000L else now - 300_000L
+        var verifiedCount = 0
+
         for (file in files) {
             if (!file.isFile) continue
             val name = file.name
             val lower = name.lowercase()
             val mod = file.lastModified()
-            // 檢查本次拍攝期間（或近 5 分鐘內）的暫存檔
+
+            // 1. 檢查是否存在任何本次拍攝期間（或近 10 分鐘內）的暫存檔
             if ((name.startsWith(".pending") || lower.contains("pending") || lower.endsWith(".tmp")) &&
-                (mod >= sessionCutoff || now - mod < 300_000L)
+                (mod >= sessionCutoff || now - mod < SAFETY_MAX_IDLE_MS)
             ) {
-                return name
+                return VerificationResult(false, verifiedCount, "暫存檔尚未清除: $name")
             }
-            // 檢查本次拍攝期間內尚未達 1MB 的照片
-            if ((lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".heic")) &&
-                file.length() in 1 until MIN_FINISHED_FILE_SIZE_BYTES &&
-                mod >= sessionCutoff
-            ) {
-                return "$name (${file.length() / 1024} KB)"
+
+            // 2. 檢查所有本次拍攝期間新增/修改的照片，以及被追蹤清單內的照片
+            val isPhoto = lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".heic")
+            if (isPhoto && (mod >= sessionCutoff || sessionPhotoNames.contains(name))) {
+                val len = file.length()
+                if (len < MIN_FINISHED_FILE_SIZE_BYTES) {
+                    return VerificationResult(false, verifiedCount, "照片尚未算完 (< 1MB): $name (${len / 1024} KB)")
+                }
+                if (now - mod < MIN_WAIT_BEFORE_VERIFY_MS) {
+                    return VerificationResult(
+                        false,
+                        verifiedCount,
+                        "照片剛被算圖覆寫未滿 30 秒: $name (${(now - mod) / 1000}s)"
+                    )
+                }
+                verifiedCount++
             }
         }
-        return null
+        return VerificationResult(true, verifiedCount)
     }
 
     private fun ensureNetworkBlocked(reason: String) {
@@ -258,14 +285,15 @@ class CameraGuardService : AccessibilityService() {
         } else {
             GuardStateManager.notifyDelaying(this, reason)
         }
-        scheduleRestoreCheck()
+        scheduleVerifyAfterWait()
     }
 
-    private fun scheduleRestoreCheck() {
-        handler.removeCallbacks(restoreNetworkRunnable)
+    private fun scheduleVerifyAfterWait() {
+        handler.removeCallbacks(verifyAndRestoreRunnable)
         if (isCameraInForeground) return
-        val delay = GuardStateManager.getRestoreDelaySec(this) * 1000L
-        handler.postDelayed(restoreNetworkRunnable, delay)
+        val delaySec = GuardStateManager.getRestoreDelaySec(this)
+        val waitMs = maxOf(delaySec * 1000L, MIN_WAIT_BEFORE_VERIFY_MS)
+        handler.postDelayed(verifyAndRestoreRunnable, waitMs)
     }
 
     override fun onInterrupt() {
@@ -276,7 +304,7 @@ class CameraGuardService : AccessibilityService() {
         super.onDestroy()
         runCatching { unregisterReceiver(forceRestoreReceiver) }
         fileObserver?.stopWatching()
-        handler.removeCallbacks(restoreNetworkRunnable)
+        handler.removeCallbacks(verifyAndRestoreRunnable)
         if (ShizukuNetHelper.isBlocked) {
             ShizukuNetHelper.setPhotosNetworkBlocked(this, false, "無障礙服務停止，自動恢復網路")
         }
