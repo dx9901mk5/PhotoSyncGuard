@@ -29,10 +29,18 @@
     <string name="delay_preset">%1$ds</string>
     <string name="delay_note">Waits until you leave the camera and ALL photos finish processing (&gt;= 1MB, no temp files), plus the configured delay (min 30s). Reopening camera or taking another photo resets the timer.</string>
 
-    <string name="setup_title">Setup &amp; Diagnostics</string>
-    <string name="setup_hint">⚠️ Please enable Auto-start and Allow Background High Power Usage in system settings so the OS does not kill this app.</string>
-    <string name="btn_grant_all_shizuku">⚡ One-Click Grant All Permissions via Shizuku</string>
+    <string name="setup_title">Required &amp; Recommended Permissions</string>
+    <string name="setup_hint">⚠️ Please also enable Auto-start and Allow Background High Power Usage in system settings so the OS does not kill this app.</string>
+    <string name="btn_grant_all_shizuku">⚡ One-Click Grant All ADB Permissions via Shizuku</string>
     <string name="toast_grant_all_result">Shizuku Grant: Media %1$s | Notify %2$s | Accessibility %3$s | Battery %4$s</string>
+    <string name="perm_row_shizuku_title">Shizuku Service Permission (Network Control)</string>
+    <string name="perm_row_media_title">Media Read Permission (Monitor /DCIM/Camera/)</string>
+    <string name="perm_row_a11y_title">Accessibility Service (Detect Camera Switch)</string>
+    <string name="perm_row_battery_title">Ignore Battery Optimizations (Keep Alive)</string>
+    <string name="perm_status_granted">Authorized</string>
+    <string name="perm_status_not_granted">Not Authorized</string>
+    <string name="perm_action_grant">Authorize</string>
+    <string name="perm_action_settings">Settings</string>
     <string name="btn_shizuku">1. Authorize Shizuku</string>
     <string name="btn_storage">2. Grant Media Read Permission</string>
     <string name="btn_accessibility">3. Enable Accessibility Service (Detect Camera)</string>

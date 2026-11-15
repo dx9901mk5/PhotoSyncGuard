@@ -1,0 +1,12 @@
+# Local handoff logs & Google Docs shortcuts (keep local only)
+HANDOFF_LOG.md
+*.gdoc
+
+# Gradle & Android build artifacts
+.gradle/
+build/
+app/build/
+local.properties
+*.iml
+.idea/
+.DS_Store

@@ -29,10 +29,18 @@
     <string name="delay_preset">%1$d秒</string>
     <string name="delay_note">须离开相机且全部照片算图完成（&gt;= 1MB、无临时文件）后，再静置达设定秒数（至少 30 秒）才恢复上传；中途再开相机或拍照将重新判定。</string>
 
-    <string name="setup_title">权限引导与测试</string>
+    <string name="setup_title">必要与建议权限</string>
     <string name="setup_hint">⚠️ 请在系统设置开启本 App 的“自启动”与“允许后台高耗电”，避免拍到一半被系统回收。</string>
     <string name="btn_grant_all_shizuku">⚡ 一键通过 Shizuku 授予所有 ADB 权限</string>
     <string name="toast_grant_all_result">Shizuku 授权结果：图片 %1$s｜通知 %2$s｜无障碍 %3$s｜电池白名单 %4$s</string>
+    <string name="perm_row_shizuku_title">Shizuku 服务权限（动态断网与 ADB 授权）</string>
+    <string name="perm_row_media_title">相册目录读取权限（监听 /DCIM/Camera/）</string>
+    <string name="perm_row_a11y_title">无障碍服务（实时追踪相机窗口切换）</string>
+    <string name="perm_row_battery_title">忽略电池优化（后台常驻防系统回收）</string>
+    <string name="perm_status_granted">已授权</string>
+    <string name="perm_status_not_granted">未授权</string>
+    <string name="perm_action_grant">授权</string>
+    <string name="perm_action_settings">前往设置</string>
     <string name="btn_shizuku">1. 授权 Shizuku</string>
     <string name="btn_storage">2. 授权相册目录监听 (读取图片权限)</string>
     <string name="btn_accessibility">3. 开启无障碍服务 (检测相机)</string>

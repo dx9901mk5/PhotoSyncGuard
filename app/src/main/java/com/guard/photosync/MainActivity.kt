@@ -9,8 +9,10 @@ import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.provider.Settings
 import android.view.Gravity
+import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -34,6 +36,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var notifySwitch: MaterialSwitch
     private lateinit var delayValueText: TextView
     private lateinit var delaySlider: Slider
+    private lateinit var permShizukuStatus: TextView
+    private lateinit var permMediaStatus: TextView
+    private lateinit var permA11yStatus: TextView
+    private lateinit var permBatteryStatus: TextView
     private lateinit var logContainer: LinearLayout
     private lateinit var logCountText: TextView
 
@@ -349,7 +355,10 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        val btnShizuku = createActionButton(getString(R.string.btn_shizuku)) {
+        val (rowShizuku, statusShizuku) = createPermissionRow(
+            getString(R.string.perm_row_shizuku_title),
+            getString(R.string.perm_action_grant)
+        ) {
             if (Shizuku.pingBinder()) {
                 if (Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) {
                     Shizuku.requestPermission(100)
@@ -360,8 +369,12 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this, getString(R.string.toast_shizuku_not_running), Toast.LENGTH_SHORT).show()
             }
         }
+        permShizukuStatus = statusShizuku
 
-        val btnStorage = createActionButton(getString(R.string.btn_storage)) {
+        val (rowMedia, statusMedia) = createPermissionRow(
+            getString(R.string.perm_row_media_title),
+            getString(R.string.perm_action_grant)
+        ) {
             val perm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 Manifest.permission.READ_MEDIA_IMAGES
             } else {
@@ -369,10 +382,27 @@ class MainActivity : AppCompatActivity() {
             }
             ActivityCompat.requestPermissions(this, arrayOf(perm), 101)
         }
+        permMediaStatus = statusMedia
 
-        val btnAccessibility = createActionButton(getString(R.string.btn_accessibility)) {
+        val (rowA11y, statusA11y) = createPermissionRow(
+            getString(R.string.perm_row_a11y_title),
+            getString(R.string.perm_action_settings)
+        ) {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
         }
+        permA11yStatus = statusA11y
+
+        val (rowBattery, statusBattery) = createPermissionRow(
+            getString(R.string.perm_row_battery_title),
+            getString(R.string.perm_action_settings)
+        ) {
+            runCatching {
+                startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+            }.onFailure {
+                startActivity(Intent(Settings.ACTION_SETTINGS))
+            }
+        }
+        permBatteryStatus = statusBattery
 
         val btnTestBlock = MaterialButton(
             this,
@@ -384,7 +414,7 @@ class MainActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = dp(6) }
+            ).apply { topMargin = dp(10) }
             setOnClickListener {
                 ShizukuNetHelper.setPhotosNetworkBlocked(
                     this@MainActivity,
@@ -398,9 +428,13 @@ class MainActivity : AppCompatActivity() {
         inner.addView(header)
         inner.addView(hint)
         inner.addView(btnGrantAllShizuku)
-        inner.addView(btnShizuku)
-        inner.addView(btnStorage)
-        inner.addView(btnAccessibility)
+        inner.addView(rowShizuku)
+        inner.addView(createDivider())
+        inner.addView(rowMedia)
+        inner.addView(createDivider())
+        inner.addView(rowA11y)
+        inner.addView(createDivider())
+        inner.addView(rowBattery)
         inner.addView(btnTestBlock)
         card.addView(inner)
         return card
@@ -621,6 +655,21 @@ class MainActivity : AppCompatActivity() {
             if (blocked) R.color.status_blocked_fg else R.color.status_safe_fg
         )
 
+        val mediaPerm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            Manifest.permission.READ_MEDIA_IMAGES
+        } else {
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+        val mediaReady = ContextCompat.checkSelfPermission(this, mediaPerm) == PackageManager.PERMISSION_GRANTED
+        val a11yReady = ShizukuNetHelper.isAccessibilityEnabled(this)
+        val pm = getSystemService(POWER_SERVICE) as PowerManager
+        val batteryReady = pm.isIgnoringBatteryOptimizations(packageName)
+
+        updatePermStatusView(permShizukuStatus, shizukuReady)
+        updatePermStatusView(permMediaStatus, mediaReady)
+        updatePermStatusView(permA11yStatus, a11yReady)
+        updatePermStatusView(permBatteryStatus, batteryReady)
+
         notifySwitch.isChecked = GuardStateManager.isNotificationEnabled(this)
 
         val delaySec = GuardStateManager.getRestoreDelaySec(this)
@@ -740,6 +789,68 @@ class MainActivity : AppCompatActivity() {
         tv.background = GradientDrawable().apply {
             setColor(ContextCompat.getColor(this@MainActivity, bgRes))
             cornerRadius = dp(10).toFloat()
+        }
+    }
+
+    private fun createPermissionRow(
+        titleText: String,
+        actionText: String,
+        onAction: () -> Unit
+    ): Pair<LinearLayout, TextView> {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(10), 0, dp(10))
+        }
+        val textCol = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        val titleTv = TextView(this).apply {
+            text = titleText
+            textSize = 14f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface))
+        }
+        val statusTv = TextView(this).apply {
+            textSize = 12f
+            setPadding(0, dp(2), 0, 0)
+        }
+        textCol.addView(titleTv)
+        textCol.addView(statusTv)
+
+        val actionBtn = MaterialButton(
+            this,
+            null,
+            com.google.android.material.R.attr.borderlessButtonStyle
+        ).apply {
+            text = actionText
+            textSize = 13f
+            setOnClickListener { onAction() }
+        }
+
+        row.addView(textCol)
+        row.addView(actionBtn)
+        return row to statusTv
+    }
+
+    private fun updatePermStatusView(tv: TextView, granted: Boolean) {
+        tv.text = getString(if (granted) R.string.perm_status_granted else R.string.perm_status_not_granted)
+        tv.setTextColor(
+            ContextCompat.getColor(
+                this,
+                if (granted) R.color.status_safe_fg else R.color.md_on_surface_muted
+            )
+        )
+    }
+
+    private fun createDivider(): View {
+        return View(this).apply {
+            setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.md_outline))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(1)
+            )
         }
     }
 
