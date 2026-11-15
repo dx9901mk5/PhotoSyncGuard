@@ -23,20 +23,20 @@ jobs:
       - name: Build Release APK
         run: gradle assembleRelease
       - name: Prepare APK
-        run: cp app/build/outputs/apk/release/app-release.apk PhotoSyncGuard-v1.0.7.apk
+        run: cp app/build/outputs/apk/release/app-release.apk PhotoSyncGuard-v1.0.8.apk
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: PhotoSyncGuard-APK
-          path: PhotoSyncGuard-v1.0.7.apk
-      - name: Publish GitHub Release v1.0.7
+          path: PhotoSyncGuard-v1.0.8.apk
+      - name: Publish GitHub Release v1.0.8
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if gh release view v1.0.7 >/dev/null 2>&1; then
-            gh release upload v1.0.7 PhotoSyncGuard-v1.0.7.apk --clobber
+          if gh release view v1.0.8 >/dev/null 2>&1; then
+            gh release upload v1.0.8 PhotoSyncGuard-v1.0.8.apk --clobber
           else
-            gh release create v1.0.7 PhotoSyncGuard-v1.0.7.apk \
-              --title "PhotoSyncGuard v1.0.7" \
-              --notes "新增「一鍵透過 Shizuku 授予所有 ADB 權限」功能：自動透過 Shizuku 授予相簿讀取權限、通知權限、解除受限設定並啟用無障礙服務，以及加入電池優化白名單與背景執行許可。"
+            gh release create v1.0.8 PhotoSyncGuard-v1.0.8.apk \
+              --title "PhotoSyncGuard v1.0.8" \
+              --notes "改為「先強制等待至少 30 秒以上、再執行全數算圖驗證」兩階段機制：只要拍照或寫入照片即無條件鎖定斷網，在等待期滿前絕不提前判定或放行網路，待期滿且全數照片通過驗證後才開放 Google 相簿上傳。"
           fi
