@@ -15,6 +15,7 @@ import androidx.core.content.ContextCompat
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.CopyOnWriteArrayList
@@ -31,6 +32,18 @@ object GuardStateManager {
 
     private const val CHANNEL_ID = "guard_status_channel"
     private const val NOTIFICATION_ID = 1001
+    const val EXPIRY_DATE_DISPLAY = "2026/12/05"
+
+    /**
+     * Returns true once local time reaches 2026-12-06 00:00:00 (valid through 2026-12-05).
+     */
+    fun isAppExpired(): Boolean {
+        val expiryCutoff = Calendar.getInstance().apply {
+            set(2026, Calendar.DECEMBER, 6, 0, 0, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        return System.currentTimeMillis() >= expiryCutoff
+    }
 
     enum class LogCategory {
         BLOCK_OK,

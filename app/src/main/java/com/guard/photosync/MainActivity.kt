@@ -42,8 +42,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var permBatteryStatus: TextView
     private lateinit var logContainer: LinearLayout
     private lateinit var logCountText: TextView
+    private var isExpiredMode = false
 
     private val permissionListener = Shizuku.OnRequestPermissionResultListener { _, grantResult ->
+        if (isExpiredMode) return@OnRequestPermissionResultListener
         updateUI()
         if (grantResult == PackageManager.PERMISSION_GRANTED) {
             Toast.makeText(this, getString(R.string.toast_shizuku_granted), Toast.LENGTH_SHORT).show()
@@ -52,11 +54,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private val stateListener: () -> Unit = {
-        updateUI()
+        if (!isExpiredMode) updateUI()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (GuardStateManager.isAppExpired()) {
+            showExpiredScreen()
+            return
+        }
         Shizuku.addRequestPermissionResultListener(permissionListener)
         GuardStateManager.addListener(stateListener)
 
@@ -635,7 +641,87 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        if (GuardStateManager.isAppExpired()) {
+            if (!isExpiredMode) showExpiredScreen()
+            return
+        }
+        if (isExpiredMode) return
         updateUI()
+    }
+
+    private fun showExpiredScreen() {
+        isExpiredMode = true
+        sendBroadcast(Intent(CameraGuardService.ACTION_FORCE_RESTORE).setPackage(packageName))
+        if (ShizukuNetHelper.isBlocked) {
+            ShizukuNetHelper.setPhotosNetworkBlocked(
+                this,
+                false,
+                "App expired after ${GuardStateManager.EXPIRY_DATE_DISPLAY}"
+            )
+        }
+
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.md_background))
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        }
+
+        val toolbar = MaterialToolbar(this).apply {
+            title = getString(R.string.app_name)
+            setTitleTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface))
+            setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.md_surface))
+            elevation = dp(2).toFloat()
+        }
+        root.addView(toolbar)
+
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(dp(24), dp(24), dp(24), dp(24))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            )
+        }
+
+        val card = createCard(strokeColorRes = R.color.failsafe_bg, strokeWidthDp = 2)
+        val inner = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(20), dp(20), dp(20))
+        }
+
+        val title = TextView(this).apply {
+            text = getString(R.string.expired_title)
+            textSize = 18f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.failsafe_bg))
+        }
+        val msg = TextView(this).apply {
+            text = getString(R.string.expired_message, GuardStateManager.EXPIRY_DATE_DISPLAY)
+            textSize = 14f
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.md_on_surface))
+            setPadding(0, dp(10), 0, dp(18))
+        }
+        val exitBtn = createActionButton(getString(R.string.expired_btn_exit)) {
+            finishAffinity()
+        }.apply {
+            backgroundTintList = ColorStateList.valueOf(
+                ContextCompat.getColor(this@MainActivity, R.color.failsafe_bg)
+            )
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.failsafe_fg))
+        }
+
+        inner.addView(title)
+        inner.addView(msg)
+        inner.addView(exitBtn)
+        card.addView(inner)
+        container.addView(card)
+        root.addView(container)
+        setContentView(root)
     }
 
     private fun updateUI() {

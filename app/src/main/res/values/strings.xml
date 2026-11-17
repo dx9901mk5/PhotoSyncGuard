@@ -80,4 +80,8 @@
     <string name="notif_delay_title">⏳ Delaying Google Photos Upload</string>
     <string name="notif_delay_big_fmt">%1$s\nNetwork will automatically restore once camera processing completes (&gt;= 1MB).</string>
     <string name="notif_restored_title">✅ Processing Complete — Google Photos Restored</string>
+
+    <string name="expired_title">Version Expired</string>
+    <string name="expired_message">This version of PhotoSyncGuard was valid through %1$s and has now expired. All features have been disabled.</string>
+    <string name="expired_btn_exit">Exit App</string>
 </resources>

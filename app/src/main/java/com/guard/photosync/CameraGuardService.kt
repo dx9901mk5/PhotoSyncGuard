@@ -69,6 +69,7 @@ class CameraGuardService : AccessibilityService() {
 
     private val verifyAndRestoreRunnable: Runnable = object : Runnable {
         override fun run() {
+            if (handleIfExpired()) return
             if (isCameraInForeground || !ShizukuNetHelper.isBlocked) return
 
             val now = System.currentTimeMillis()
@@ -140,8 +141,29 @@ class CameraGuardService : AccessibilityService() {
         loggedShotFiles.clear()
     }
 
+    private fun handleIfExpired(): Boolean {
+        if (!GuardStateManager.isAppExpired()) return false
+        handler.removeCallbacks(verifyAndRestoreRunnable)
+        fileObserver?.stopWatching()
+        isCameraInForeground = false
+        resetSession()
+        if (ShizukuNetHelper.isBlocked) {
+            ShizukuNetHelper.setPhotosNetworkBlocked(
+                this,
+                false,
+                "App expired after ${GuardStateManager.EXPIRY_DATE_DISPLAY}"
+            )
+        }
+        return true
+    }
+
     override fun onServiceConnected() {
         super.onServiceConnected()
+        if (handleIfExpired()) {
+            Log.w(TAG, "版本已超過使用期限 (${GuardStateManager.EXPIRY_DATE_DISPLAY})，停用守護服務")
+            disableSelf()
+            return
+        }
         Log.i(TAG, "無障礙服務已啟動，開始監控相機與拍照工作階段（至少 30 秒後才驗證）")
         val filter = IntentFilter(ACTION_FORCE_RESTORE)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -160,6 +182,7 @@ class CameraGuardService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        if (handleIfExpired()) return
         if (event?.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             val pkgName = event.packageName?.toString() ?: return
             if (pkgName == "com.android.systemui" || pkgName == packageName) return
@@ -197,6 +220,7 @@ class CameraGuardService : AccessibilityService() {
             CREATE or CLOSE_WRITE or MOVED_TO or MODIFY or DELETE or MOVED_FROM
         ) {
             override fun onEvent(event: Int, path: String?) {
+                if (handleIfExpired()) return
                 if (path == null) return
                 val now = System.currentTimeMillis()
                 lastFileEventTimeMs = now

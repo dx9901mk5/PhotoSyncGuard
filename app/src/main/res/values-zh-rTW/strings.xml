@@ -80,4 +80,8 @@
     <string name="notif_delay_title">⏳ 正在延遲 Google 相簿網路上傳</string>
     <string name="notif_delay_big_fmt">%1$s\n待相機算圖完成（&gt;= 1MB）後將自動恢復網路上傳。</string>
     <string name="notif_restored_title">✅ 相機算圖完畢，已恢復 Google 相簿上傳</string>
+
+    <string name="expired_title">此版本已過期失效</string>
+    <string name="expired_message">本版本 PhotoSyncGuard 使用期限至 %1$s 止，目前已超過使用期限，所有功能已停用且無法繼續使用。</string>
+    <string name="expired_btn_exit">關閉應用程式</string>
 </resources>
