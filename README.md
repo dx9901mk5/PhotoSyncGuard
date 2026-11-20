@@ -1,8 +1,14 @@
 # PhotoSyncGuard
 
-> **📢 專案狀態 / Project Status：最終版（Final Release）**
-> 本專案已發佈最終版本，後續將不再進行功能更新與維護。  
-> This project has reached its final release and is no longer actively updated or maintained.
+> ### 📢 專案狀態、使用到期日與整合版遷移公告 / Final Release, Expiration & Migration Notice
+> - **獨立版 App 使用到期日**：**`2026/12/01`**（自 `2026-12-02 00:00:00` 起本獨立版 App 將停止運作，且**使用期限到期後將移除本儲存庫中的 APK 下載檔案**）。
+> - **功能已整合至全新多合一儲存庫**：本專案已發佈最終獨立版，後續不再單獨更新與維護；所有功能已完整整合至 **[Android-CN-System-Enhancer](https://github.com/dx9901mk5/Android-CN-System-Enhancer)**，請改前往新儲存庫下載與使用：  
+>   👉 **[https://github.com/dx9901mk5/Android-CN-System-Enhancer](https://github.com/dx9901mk5/Android-CN-System-Enhancer)**
+>
+> ---
+> - **Standalone App Expiration Date**: **`2026/12/01`** (This standalone app will stop functioning starting `2026-12-02 00:00:00`, and **the APK download file will be removed from this repository after the expiration date**).
+> - **Integrated into All-in-One Repository**: This standalone project has reached its final release and is no longer maintained separately. Its features have been fully integrated into **[Android-CN-System-Enhancer](https://github.com/dx9901mk5/Android-CN-System-Enhancer)** — please visit the new repository for future downloads and updates:  
+>   👉 **[https://github.com/dx9901mk5/Android-CN-System-Enhancer](https://github.com/dx9901mk5/Android-CN-System-Enhancer)**
 
 [繁體中文](#繁體中文說明) | [English](#english-description)
 
