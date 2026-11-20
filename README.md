@@ -1,5 +1,9 @@
 # PhotoSyncGuard
 
+> **📢 專案狀態 / Project Status：最終版（Final Release）**
+> 本專案已發佈最終版本，後續將不再進行功能更新與維護。  
+> This project has reached its final release and is no longer actively updated or maintained.
+
 [繁體中文](#繁體中文說明) | [English](#english-description)
 
 ---

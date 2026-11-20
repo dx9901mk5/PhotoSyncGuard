@@ -32,14 +32,14 @@ object GuardStateManager {
 
     private const val CHANNEL_ID = "guard_status_channel"
     private const val NOTIFICATION_ID = 1001
-    const val EXPIRY_DATE_DISPLAY = "2026/12/05"
+    const val EXPIRY_DATE_DISPLAY = "2026/12/01"
 
     /**
-     * Returns true once local time reaches 2026-12-06 00:00:00 (valid through 2026-12-05).
+     * Returns true once local time reaches 2026-12-02 00:00:00 (valid through 2026-12-01).
      */
     fun isAppExpired(): Boolean {
         val expiryCutoff = Calendar.getInstance().apply {
-            set(2026, Calendar.DECEMBER, 6, 0, 0, 0)
+            set(2026, Calendar.DECEMBER, 2, 0, 0, 0)
             set(Calendar.MILLISECOND, 0)
         }.timeInMillis
         return System.currentTimeMillis() >= expiryCutoff
